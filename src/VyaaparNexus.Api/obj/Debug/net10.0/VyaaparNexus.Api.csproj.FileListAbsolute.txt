@@ -1,0 +1,8 @@
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Api\obj\Debug\net10.0\VyaaparNexus.Api.csproj.AssemblyReference.cache
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Api\obj\Debug\net10.0\rpswa.dswa.cache.json
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Api\obj\Debug\net10.0\VyaaparNexus.Api.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Api\obj\Debug\net10.0\VyaaparNexus.Api.AssemblyInfoInputs.cache
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Api\obj\Debug\net10.0\VyaaparNexus.Api.AssemblyInfo.cs
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Api\obj\Debug\net10.0\VyaaparNexus.Api.csproj.CoreCompileInputs.cache
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Api\obj\Debug\net10.0\VyaaparNexus.Api.MvcApplicationPartsAssemblyInfo.cs
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Api\obj\Debug\net10.0\VyaaparNexus.Api.MvcApplicationPartsAssemblyInfo.cache

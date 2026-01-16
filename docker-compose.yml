@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # THE MESSAGE BROKER (The "Nervous System")
+  # ---------------------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: nexus-broker
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Dashboard
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - nexus-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # THE DATABASE (The "Source of Truth")
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16
+    container_name: nexus-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=vyaapar_nexus_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nexus-network
+
+  # ---------------------------------------------------------------------------
+  # THE DISTRIBUTED CACHE (The "Speed Layer")
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:alpine
+    container_name: nexus-cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - nexus-network
+
+# ---------------------------------------------------------------------------
+# NETWORKS & VOLUMES
+# ---------------------------------------------------------------------------
+networks:
+  nexus-network:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,163 @@
+@import "tailwindcss";
+
+@theme {
+  --color-vedic-gold: #FFD700;
+  --color-cosmic-black: #0a0a0f;
+  --color-neon-teal: #00f3ff;
+  --color-deep-maroon: #800000;
+  --color-cyber-gray: #1a1a2e;
+  --color-paper-white: #f5f5f5;
+
+  --font-orbitron: 'Orbitron', sans-serif;
+  --font-inter: 'Inter', sans-serif;
+  --font-rajdhani: 'Rajdhani', sans-serif;
+}
+
+/* 
+  NOTE: If using Tailwind v3, usage @tailwind base/components/utilities.
+  Since installed version appeared to be v4, I'm using v4 syntax temporarily.
+  BUT, to be safe for standard Vite template, I'll fallback to v3 standard directives.
+  I will use the standard v3 directives because they are safer unless I am 100% sure v4 is active and configured.
+  Wait, the user listed version 4.1.18. If it is high, it might be the v4 alpha. 
+  However, standard PostCSS setup usually implies v3. 
+  Let's stick to v3 syntax for now. If it breaks, I'll see invalid CSS.
+*/
+
+/* @tailwind base;
+@tailwind components;
+@tailwind utilities; */
+
+@layer base {
+  body {
+    @apply font-inter bg-cosmic-black text-gray-100;
+  }
+}
+
+/* Design Tokens & Utilities */
+.theme-vedic-dark {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #1a1a2e;
+  --accent-primary: #FFD700;
+  /* Gold */
+  --accent-secondary: #00f3ff;
+  /* Teal */
+  --text-primary: #e2e8f0;
+  --border-color: rgba(255, 215, 0, 0.2);
+}
+
+
+.theme-vedic-light {
+  --bg-primary: #f5f5f5;
+  /* Light gray background for better definition */
+  --bg-secondary: #ffffff;
+  /* White cards */
+  --accent-primary: #800000;
+  /* Maroon */
+  --accent-secondary: #FFD700;
+  /* Gold */
+  --text-primary: #1a1a1a;
+  /* Dark text for WCAG AA compliance */
+  --text-secondary: #666666;
+  /* Secondary text */
+  --border-color: #e0e0e0;
+  /* Defined borders */
+}
+
+/* Glassmorphism */
+.glass-panel {
+  @apply backdrop-blur-md border border-white/10 shadow-lg;
+  background: rgba(26, 26, 46, 0.6);
+}
+
+[data-theme='light'] .glass-panel {
+  background: #ffffff;
+  border-color: #e0e0e0;
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.08), 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  /* Material design elevation shadow */
+}
+
+/* Log level status colors for light mode */
+[data-theme='light'] .log-info {
+  background-color: #e3f2fd;
+  color: #0d47a1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+[data-theme='light'] .log-warn {
+  background-color: #fff3e0;
+  color: #e65100;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+[data-theme='light'] .log-error {
+  background-color: #ffebee;
+  color: #b71c1c;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+[data-theme='light'] .log-critical {
+  background-color: #ffebee;
+  color: #b71c1c;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+/* CRT Scanline Effect (Optional, for "Terminal" feel) */
+.scanlines {
+  background: linear-gradient(to bottom,
+      rgba(255, 255, 255, 0),
+      rgba(255, 255, 255, 0) 50%,
+      rgba(0, 0, 0, 0.1) 50%,
+      rgba(0, 0, 0, 0.1));
+  background-size: 100% 4px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 10;
+
+}
+
+/* Custom Scrollbar for Terminals */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme='light'] .custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+[data-theme='light'] .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+}
+
+[data-theme='light'] .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Scroll containment utility */
+.overscroll-contain {
+  overscroll-behavior: contain;
+}

@@ -1,0 +1,11 @@
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Contracts\bin\Debug\net8.0\VyaaparNexus.Contracts.deps.json
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Contracts\bin\Debug\net8.0\VyaaparNexus.Contracts.dll
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Contracts\bin\Debug\net8.0\VyaaparNexus.Contracts.pdb
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Contracts\obj\Debug\net8.0\VyaaparNexus.Contracts.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Contracts\obj\Debug\net8.0\VyaaparNexus.Contracts.AssemblyInfoInputs.cache
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Contracts\obj\Debug\net8.0\VyaaparNexus.Contracts.AssemblyInfo.cs
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Contracts\obj\Debug\net8.0\VyaaparNexus.Contracts.csproj.CoreCompileInputs.cache
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Contracts\obj\Debug\net8.0\VyaaparNexus.Contracts.dll
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Contracts\obj\Debug\net8.0\refint\VyaaparNexus.Contracts.dll
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Contracts\obj\Debug\net8.0\VyaaparNexus.Contracts.pdb
+C:\Users\HP\Downloads\vyaapar-nexus-core\src\VyaaparNexus.Contracts\obj\Debug\net8.0\ref\VyaaparNexus.Contracts.dll
