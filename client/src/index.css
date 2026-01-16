@@ -109,6 +109,31 @@
   font-weight: 700;
 }
 
+@layer base {
+  :root {
+    --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+    --glass-bg: rgba(255, 255, 255, 0.05);
+  }
+
+  /* Mobile Optimizations */
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    overscroll-behavior-y: none;
+    /* Prevent pull-to-refresh if desired, or at least bounce */
+  }
+
+  /* Better touch targets */
+  button,
+  a {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+  }
+}
+
 /* CRT Scanline Effect (Optional, for "Terminal" feel) */
 .scanlines {
   background: linear-gradient(to bottom,
@@ -143,6 +168,12 @@
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 640px) {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 2px;
+  }
 }
 
 [data-theme='light'] .custom-scrollbar::-webkit-scrollbar-track {
