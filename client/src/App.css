@@ -1,42 +1,290 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
+/* App.css */
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
+@keyframes float {
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
+  0%,
+  100% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0;
   }
-  to {
-    transform: rotate(360deg);
+
+  10% {
+    opacity: 0.6;
+  }
+
+  50% {
+    transform: translateY(-100vh) translateX(50px) scale(1.5);
+    opacity: 0.3;
+  }
+
+  90% {
+    opacity: 0.6;
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+.animate-float {
+  animation: float linear infinite;
+}
+
+/* Chaos mode pulsing effect */
+@keyframes chaos-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 40px rgba(239, 68, 68, 0.5);
   }
 }
 
-.card {
-  padding: 2em;
+.chaos-active {
+  animation: chaos-pulse 2s ease-in-out infinite;
 }
 
-.read-the-docs {
-  color: #888;
+:root {
+  --chaos-intensity: 0;
+  --chaos-red: rgba(239, 68, 68, 0);
+  --chaos-orange: rgba(234, 88, 12, 0);
+}
+
+/* =========================================
+   PART 1: UNIVERSAL GLASSMORPHISM UTILITIES
+   ========================================= */
+
+/* Core glassmorphism */
+.glass {
+  background: rgba(17, 24, 39, 0.6);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(75, 85, 99, 0.3);
+}
+
+.glass-strong {
+  background: rgba(17, 24, 39, 0.7);
+  backdrop-filter: blur(20px) saturate(200%);
+  -webkit-backdrop-filter: blur(20px) saturate(200%);
+  border: 1px solid rgba(75, 85, 99, 0.4);
+}
+
+.glass-light {
+  background: rgba(17, 24, 39, 0.4);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(75, 85, 99, 0.2);
+}
+
+/* Chaos mode variants */
+.glass-chaos {
+  background: rgba(17, 24, 39, 0.4);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  box-shadow:
+    0 8px 32px 0 rgba(239, 68, 68, 0.15),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.glass-chaos-strong {
+  background: rgba(17, 24, 39, 0.5);
+  backdrop-filter: blur(20px) saturate(200%);
+  -webkit-backdrop-filter: blur(20px) saturate(200%);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  box-shadow:
+    0 12px 40px 0 rgba(239, 68, 68, 0.2),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Text readability enhancement */
+.glass-text {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.glass-chaos .glass-text {
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+/* =========================================
+   PART 2: CUSTOM THEMED SCROLLBARS
+   ========================================= */
+
+/* ========== MAIN PAGE SCROLLBAR ========== */
+
+/* Normal mode scrollbar - Cyan/Blue theme */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(17, 24, 39, 0.4);
+  backdrop-filter: blur(10px);
+  border-radius: 10px;
+  margin: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg,
+      rgba(6, 182, 212, 0.5) 0%,
+      rgba(14, 165, 233, 0.6) 100%);
+  border-radius: 10px;
+  border: 2px solid rgba(17, 24, 39, 0.3);
+  backdrop-filter: blur(8px);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg,
+      rgba(6, 182, 212, 0.7) 0%,
+      rgba(14, 165, 233, 0.8) 100%);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg,
+      rgba(6, 182, 212, 0.9) 0%,
+      rgba(14, 165, 233, 1) 100%);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(6, 182, 212, 0.6) rgba(17, 24, 39, 0.4);
+}
+
+/* ========== CHAOS MODE SCROLLBAR ========== */
+
+.chaos-mode::-webkit-scrollbar-track {
+  background: rgba(17, 24, 39, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+.chaos-mode::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg,
+      rgba(239, 68, 68, 0.6) 0%,
+      rgba(220, 38, 38, 0.7) 100%);
+  border: 2px solid rgba(17, 24, 39, 0.4);
+  backdrop-filter: blur(8px);
+}
+
+.chaos-mode::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg,
+      rgba(239, 68, 68, 0.8) 0%,
+      rgba(220, 38, 38, 0.9) 100%);
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+}
+
+.chaos-mode::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg,
+      rgba(239, 68, 68, 1) 0%,
+      rgba(220, 38, 38, 1) 100%);
+}
+
+.chaos-mode {
+  scrollbar-color: rgba(239, 68, 68, 0.7) rgba(17, 24, 39, 0.5);
+}
+
+/* ========== LOG TERMINAL SCROLLBAR ========== */
+
+.log-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.log-scrollbar::-webkit-scrollbar-track {
+  background: rgba(17, 24, 39, 0.6);
+  backdrop-filter: blur(8px);
+  border-radius: 3px;
+}
+
+.log-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg,
+      rgba(34, 211, 238, 0.4) 0%,
+      rgba(6, 182, 212, 0.5) 100%);
+  border-radius: 3px;
+  border: 1px solid rgba(17, 24, 39, 0.3);
+}
+
+.log-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg,
+      rgba(34, 211, 238, 0.6) 0%,
+      rgba(6, 182, 212, 0.7) 100%);
+}
+
+/* Chaos mode log scrollbar */
+.chaos-mode .log-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg,
+      rgba(251, 113, 133, 0.5) 0%,
+      rgba(239, 68, 68, 0.6) 100%);
+}
+
+.chaos-mode .log-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg,
+      rgba(251, 113, 133, 0.7) 0%,
+      rgba(239, 68, 68, 0.8) 100%);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+/* ========== SIDEBAR SCROLLBAR ========== */
+
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: rgba(17, 24, 39, 0.4);
+  backdrop-filter: blur(8px);
+  border-radius: 3px;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg,
+      rgba(234, 179, 8, 0.4) 0%,
+      rgba(202, 138, 4, 0.5) 100%);
+  border-radius: 3px;
+  border: 1px solid rgba(17, 24, 39, 0.3);
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg,
+      rgba(234, 179, 8, 0.6) 0%,
+      rgba(202, 138, 4, 0.7) 100%);
+}
+
+/* Chaos mode sidebar scrollbar */
+.chaos-mode .sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg,
+      rgba(251, 146, 60, 0.5) 0%,
+      rgba(249, 115, 22, 0.6) 100%);
+}
+
+.chaos-mode .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg,
+      rgba(251, 146, 60, 0.7) 0%,
+      rgba(249, 115, 22, 0.8) 100%);
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.5);
+}
+
+/* ========== MOBILE SCROLLBAR ========== */
+
+@media (max-width: 640px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  .log-scrollbar::-webkit-scrollbar,
+  .sidebar-scrollbar::-webkit-scrollbar {
+    width: 3px;
+  }
+}
+
+/* ========== SMOOTH SCROLLING ========== */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Prevent scroll bounce on iOS */
+body {
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
 }

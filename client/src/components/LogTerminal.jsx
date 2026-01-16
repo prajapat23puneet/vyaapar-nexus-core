@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { clsx } from 'clsx';
 
-const LogTerminal = ({ logs, theme = 'dark' }) => {
+const LogTerminal = ({ logs, theme = 'dark', chaosMode = false }) => {
     const logContainerRef = useRef(null);
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const [autoScroll, setAutoScroll] = useState(true);
@@ -27,26 +27,31 @@ const LogTerminal = ({ logs, theme = 'dark' }) => {
     }, [logs, autoScroll]);
 
     return (
-        <div className="glass-panel p-4 rounded-xl flex flex-col h-full overflow-hidden">
+        <div className={clsx(
+            "p-4 rounded-xl flex flex-col h-full overflow-hidden transition-all duration-500",
+            chaosMode
+                ? "glass-chaos border-red-500/30 shadow-lg shadow-red-500/10"
+                : "glass border-gray-700/40"
+        )}>
             <div className={clsx(
                 "flex justify-between items-center mb-2 border-b pb-2",
-                theme === 'dark' ? "border-white/10" : "border-gray-200"
+                chaosMode ? "border-red-500/30" : (theme === 'dark' ? "border-white/10" : "border-gray-200")
             )}>
                 <h3 className={clsx(
                     "font-mono text-xs uppercase flex items-center gap-2",
-                    theme === 'dark' ? "text-neon-teal" : "text-blue-600"
+                    chaosMode ? "text-red-400" : (theme === 'dark' ? "text-neon-teal" : "text-blue-600")
                 )}>
                     <span className={clsx(
                         "w-2 h-2 rounded-full animate-pulse",
-                        theme === 'dark' ? "bg-neon-teal" : "bg-blue-600"
+                        chaosMode ? "bg-red-500" : (theme === 'dark' ? "bg-neon-teal" : "bg-blue-600")
                     )} />
-                    System Logs
+                    SYSTEM LOGS {chaosMode && '⚠️'}
                 </h3>
 
                 <div className="flex gap-3 items-center">
                     <span className={clsx(
                         "text-xs",
-                        theme === 'dark' ? "text-gray-500" : "text-gray-600"
+                        chaosMode ? "text-red-300/70" : (theme === 'dark' ? "text-gray-500" : "text-gray-600")
                     )}>{logs.length} entries</span>
 
                     {/* Show indicator when auto-scroll is paused */}
@@ -55,9 +60,11 @@ const LogTerminal = ({ logs, theme = 'dark' }) => {
                             onClick={() => setAutoScroll(true)}
                             className={clsx(
                                 "text-[10px] px-2 py-0.5 rounded uppercase tracking-wider font-bold animate-pulse",
-                                theme === 'dark'
-                                    ? "bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30"
-                                    : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                                chaosMode
+                                    ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                                    : (theme === 'dark'
+                                        ? "bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30"
+                                        : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200")
                             )}
                         >
                             ⬇ Resume
@@ -69,7 +76,7 @@ const LogTerminal = ({ logs, theme = 'dark' }) => {
             <div
                 ref={logContainerRef}
                 onScroll={handleScroll}
-                className="flex-1 overflow-y-auto font-mono text-xs space-y-1 pr-2 custom-scrollbar overscroll-contain"
+                className="flex-1 overflow-y-auto font-mono text-xs space-y-1 pr-2 log-scrollbar overscroll-contain"
                 style={{
                     overscrollBehavior: 'contain', // Critical for preventing page scroll
                 }}
@@ -84,25 +91,29 @@ const LogTerminal = ({ logs, theme = 'dark' }) => {
                     <div key={i} className="flex gap-2 animate-in fade-in slide-in-from-bottom-1 duration-300 items-start">
                         <span className={clsx(
                             "whitespace-nowrap",
-                            theme === 'dark' ? "text-gray-500" : "text-gray-600"
+                            chaosMode ? "text-red-500/50" : (theme === 'dark' ? "text-gray-500" : "text-gray-600")
                         )}>[{log.Timestamp}]</span>
                         <span className={clsx(
                             "font-bold w-12 inline-block",
-                            theme === 'dark' && log.Level === 'INFO' && "text-blue-400",
-                            theme === 'dark' && log.Level === 'WARN' && "text-yellow-400",
-                            theme === 'dark' && (log.Level === 'ERROR' || log.Level === 'CRITICAL') && "text-red-500",
-                            theme === 'light' && log.Level === 'INFO' && "log-info",
-                            theme === 'light' && log.Level === 'WARN' && "log-warn",
-                            theme === 'light' && log.Level === 'ERROR' && "log-error",
-                            theme === 'light' && log.Level === 'CRITICAL' && "log-critical"
+                            chaosMode && (log.Level === 'ERROR' || log.Level === 'CRITICAL') && "text-red-500 animate-pulse",
+                            chaosMode && log.Level !== 'ERROR' && log.Level !== 'CRITICAL' && "text-red-400",
+
+                            !chaosMode && theme === 'dark' && log.Level === 'INFO' && "text-blue-400",
+                            !chaosMode && theme === 'dark' && log.Level === 'WARN' && "text-yellow-400",
+                            !chaosMode && theme === 'dark' && (log.Level === 'ERROR' || log.Level === 'CRITICAL') && "text-red-500",
+
+                            !chaosMode && theme === 'light' && log.Level === 'INFO' && "log-info",
+                            !chaosMode && theme === 'light' && log.Level === 'WARN' && "log-warn",
+                            !chaosMode && theme === 'light' && log.Level === 'ERROR' && "log-error",
+                            !chaosMode && theme === 'light' && log.Level === 'CRITICAL' && "log-critical"
                         )}>{log.Level}</span>
                         <span className={clsx(
-                            theme === 'dark' ? "text-gray-300" : "text-gray-800"
+                            chaosMode ? "text-red-100" : (theme === 'dark' ? "text-gray-300" : "text-gray-800")
                         )}>{log.Message}</span>
                     </div>
                 ))}
             </div>
-        </div>
+        </div >
     );
 };
 

@@ -152,7 +152,7 @@
 
 }
 
-/* Custom Scrollbar for Terminals */
+/* Custom Scrollbar for Terminals - MOVED TO App.css for enhanced theming
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
@@ -186,7 +186,8 @@
 
 [data-theme='light'] .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
-}
+} 
+*/
 
 /* Scroll containment utility */
 .overscroll-contain {
