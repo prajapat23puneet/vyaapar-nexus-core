@@ -14,7 +14,7 @@
 
 *Saga Orchestration • Event-Driven Architecture • Real-Time Observability*
 
-[🌐 Live Demo](https://vyapaar-nexus.netlify.app) • [📖 Architecture](#-architecture) • [🛠️ Tech Stack](#️-tech-stack) • [🚀 Quick Start](#-quick-start)
+[🌐 Live Demo](vyapaar-nexus.netlify.app) • [🏗️ Architecture](#architecture) • [🛠️ Tech Stack](#️-tech-stack) • [🚀 Quick Start](#-quick-start)
 
 </div>
 
@@ -190,7 +190,7 @@ simulateChaos() {
 ```
 
 ---
-
+<a id="architecture"></a>
 ## 🏗️ Architecture
 
 <div align="center">
