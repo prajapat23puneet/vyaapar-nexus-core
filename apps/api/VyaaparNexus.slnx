@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="VyaaparNexus.Domain/VyaaparNexus.Domain.csproj" />
+  <Project Path="VyaaparNexus.Infrastructure/VyaaparNexus.Infrastructure.csproj" />
+</Solution>

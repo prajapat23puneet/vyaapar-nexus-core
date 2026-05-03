@@ -1,0 +1,936 @@
+════════════════════════════════════════════════════════════════════
+VYAAPARNEXUS v2 — BUILD ORDER PLAN
+FOR: GOOGLE ANTIGRAVITY AI AGENT
+PURPOSE: TELLS AGENT IN WHAT SEQUENCE TO BUILD — NOT WHAT TO BUILD
+         (SEE prd-agent-v2.txt FOR ALL SPECS AND CONTRACTS)
+VERSION: 2.0
+DATE: 2026-05-03
+════════════════════════════════════════════════════════════════════
+
+RULES FOR THE AGENT:
+- Do not skip a phase and jump ahead
+- Do not start a phase until all items in the previous are verifiable
+- Each phase has an EXIT GATE — pass all exit conditions before moving on
+- Reference prd-agent-v2.txt for all contracts, schemas, and component specs
+- Build one layer, verify it, then build the next
+- Never build frontend before the backend contract it depends on is working
+
+════════════════════════════════════════════════════════════════════
+PHASE 0 — WORKSPACE BOOTSTRAP
+Goal: Empty working monorepo with all config wired, nothing broken
+════════════════════════════════════════════════════════════════════
+
+0.1  Create root directory: vyapaar-nexus/
+0.2  Create package.json at root with pnpm workspaces config
+     packages: ["apps/*", "packages/*"]
+0.3  Create pnpm-workspace.yaml
+0.4  Create turbo.json with pipeline: build, dev, test, lint
+0.5  Create .gitignore (node_modules, bin, obj, .env*, *.user)
+0.6  Create .editorconfig (UTF-8, LF, 2-space indent for TS, 4-space for C#)
+0.7  Create root README.md placeholder (3 lines only — fill later)
+0.8  Create infra/ directory
+0.9  Create infra/docker-compose.yml
+     Services: postgres:16-alpine, rabbitmq:3.13-management-alpine,
+               redis:7-alpine, jaeger:all-in-one:1.57
+     Ports: 5432, 5672, 15672, 6379, 16686, 4317
+     Named volume: postgres_data
+0.10 Create infra/.env.example with all env var keys, no values
+0.11 Create .github/workflows/ci.yml (empty trigger skeleton)
+0.12 Create .github/workflows/deploy.yml (empty trigger skeleton)
+0.13 Create docs/adr/ with 3 placeholder ADR files
+
+EXIT GATE 0:
+[ ] pnpm install at root completes with no errors
+[ ] docker compose -f infra/docker-compose.yml up -d starts all 4 containers
+[ ] docker ps shows postgres, rabbitmq, redis, jaeger running
+[ ] RabbitMQ management UI accessible at localhost:15672
+
+════════════════════════════════════════════════════════════════════
+PHASE 1 — BACKEND DOMAIN AND DATABASE
+Goal: All entities modeled, DB migrated, seed data inserted
+════════════════════════════════════════════════════════════════════
+
+1.1  Create apps/api/ directory
+1.2  Create VyaaparNexus.sln
+1.3  Create project: VyaaparNexus.Domain (classlib)
+     No external dependencies
+     Create all domain entities:
+       - Customer.cs
+       - Category.cs
+       - Product.cs
+       - Order.cs
+       - OrderItem.cs
+       - SagaState.cs
+       - SagaEventLog.cs
+       - OutboxMessage.cs
+       - InboxMessage.cs
+       - ApiKey.cs
+       - MetricsSnapshot.cs
+     Create all enums:
+       - OrderStatus.cs (all 12 values)
+       - PaymentMethod.cs
+       - CircuitState.cs
+       - SagaEventType.cs
+     All field types and nullability must match prd-agent-v2.txt Section 5+6
+
+1.4  Create project: VyaaparNexus.Infrastructure (classlib)
+     Add dependencies: EF Core 8, Npgsql, MassTransit.EFCore
+     Create AppDbContext.cs
+       - DbSets for all 11 entities
+     Create Configurations/ folder
+       - One IEntityTypeConfiguration file per entity
+       - Apply table names, column types, indexes, constraints
+         exactly as per schema in prd-agent-v2.txt Section 6
+     Create Migrations/ (run: dotnet ef migrations add InitialCreate)
+     Create Seed/products.seed.json (10 products, 7 categories)
+     Create Seed/customers.seed.json (5 customers)
+     Create Seed/DatabaseSeeder.cs
+       - Seeds categories, products, customers, api_key
+       - Idempotent: check if already seeded before inserting
+       - SHA-256 hash the demo api key before storing
+
+1.5  Wire EF Core in Infrastructure DI:
+     services.AddDbContext<AppDbContext>(opts =>
+       opts.UseNpgsql(config["DATABASE_URL"]))
+
+1.6  Run: dotnet ef database update (using DATABASE_MIGRATION_URL)
+1.7  Run DatabaseSeeder on startup (call from Program.cs or hosted service)
+
+EXIT GATE 1:
+[ ] dotnet build succeeds on Domain and Infrastructure
+[ ] dotnet ef database update applies all migrations without error
+[ ] Connect to DB (Supabase SQL editor or psql):
+    - SELECT COUNT(*) FROM categories returns 7
+    - SELECT COUNT(*) FROM products returns 10
+    - SELECT COUNT(*) FROM customers returns 5
+    - SELECT COUNT(*) FROM api_keys returns 1
+    - api_keys.key_hash is not empty string
+[ ] All tables created: verify 11 tables exist
+
+════════════════════════════════════════════════════════════════════
+PHASE 2 — BACKEND API SKELETON + AUTH
+Goal: API boots, health works, auth middleware works
+════════════════════════════════════════════════════════════════════
+
+2.1  Create project: VyaaparNexus.Application (classlib)
+     Add: MediatR, FluentValidation
+     Create DTOs/ folder — all DTOs from prd-agent-v2.txt Section 20
+     Create Commands/ and Queries/ folders (empty shells for now)
+     Create Interfaces/ folder (IAnalyticsService, IInventoryService, etc.)
+
+2.2  Create project: VyaaparNexus.API (webapi)
+     Add: MediatR, FluentValidation, Serilog, prometheus-net, Swashbuckle
+     Reference: Application, Domain, Infrastructure
+
+2.3  Create Middleware/ApiKeyMiddleware.cs
+     - Read X-Api-Key header
+     - SHA-256 hash it
+     - Query api_keys WHERE key_hash = hash AND is_active = true
+     - 401 if not found
+     - Update last_used
+     - Skip for /health/* and /metrics
+
+2.4  Create Middleware/CorrelationMiddleware.cs
+     - Read X-Correlation-Id header or generate UUID
+     - Add to HttpContext items
+     - Add to Serilog log context
+
+2.5  Create Middleware/ExceptionHandlingMiddleware.cs
+     - Catch all unhandled exceptions
+     - Return normalized error payload:
+       { "error": "string", "correlationId": "uuid" }
+     - Log with structured Serilog
+
+2.6  Create Program.cs
+     - Add Serilog (Console JSON sink)
+     - Add DbContext
+     - Add MediatR
+     - Add FluentValidation
+     - Register middlewares
+     - Add Swagger
+     - Map /health/live and /health/ready
+     - Map /metrics (prometheus-net)
+     - Add CORS (allow frontend origin)
+     - Call DatabaseSeeder on startup
+
+2.7  Create Controllers/ folder
+     - Create HealthController.cs:
+       GET /health/live → { "status": "Healthy" }
+       GET /health/ready → check DB+Redis+RabbitMQ, return status
+     - Create stub controllers for Orders, Products, Customers,
+       Analytics, Stream (all return 501 Not Implemented for now)
+
+2.8  Create appsettings.json with all keys (no values, just structure)
+     Create appsettings.Development.json with local docker values
+     Create appsettings.Production.json reading from env vars
+
+EXIT GATE 2:
+[ ] dotnet run starts API on port 5000 or configured port
+[ ] GET /health/live returns 200 { "status": "Healthy" }
+[ ] GET /health/ready returns 200 with DB/Redis/RabbitMQ status
+[ ] GET /api/products with no header returns 401
+[ ] GET /api/products with X-Api-Key: vyaaparnexus-demo-key-2026 returns 501
+    (not implemented yet, but auth passes)
+[ ] GET /metrics returns prometheus text format
+[ ] Swagger UI accessible at /swagger
+
+════════════════════════════════════════════════════════════════════
+PHASE 3 — PRODUCTS + CUSTOMERS + ANALYTICS READ PATHS
+Goal: All read endpoints working with seeded data
+════════════════════════════════════════════════════════════════════
+
+3.1  Implement GetProductsQuery + handler
+     - Return paginated list of active products
+     - Include category name via join
+     - Query params: page, size, category, search, includeInactive
+
+3.2  Implement GetProductByIdQuery + handler
+
+3.3  Implement GetCategoriesQuery + handler
+
+3.4  Wire ProductsController.cs:
+     - GET /api/products
+     - GET /api/products/{id}
+     - GET /api/products/{id}/stock
+     - GET /api/categories
+     Return correct response shapes from prd-agent-v2.txt Section 10
+
+3.5  Implement CreateProductCommand + handler
+     Wire POST /api/products
+
+3.6  Implement UpdateProductCommand + handler
+     Wire PUT /api/products/{id}
+
+3.7  Implement AdjustStockCommand + handler
+     Wire PATCH /api/products/{id}/stock
+
+3.8  Wire DELETE /api/products/{id} (soft delete, is_active = false)
+
+3.9  Implement GetCustomersQuery + handler
+3.10 Implement GetCustomerByIdQuery + handler (with recent orders)
+3.11 Implement CreateCustomerCommand + handler
+3.12 Implement UpdateCustomerCommand + handler
+3.13 Wire all 4 customer endpoints in CustomersController.cs
+
+3.14 Implement GetAnalyticsSummaryQuery + handler
+     - totalOrders, completedOrders, cancelledOrders from DB
+     - activeSagas from saga_states (non-terminal count)
+     - totalRevenue from orders SUM
+     - outboxPending from outbox_messages WHERE published_at IS NULL
+     - deadLetterCount from Redis key or placeholder 0
+
+3.15 Implement GetOrdersOverTimeQuery (orders grouped by date)
+3.16 Implement GetSagaSuccessRateQuery (success/cancelled per day)
+3.17 Implement GetTopProductsQuery (join order_items, sum quantities)
+3.18 Wire all analytics endpoints in AnalyticsController.cs
+
+3.19 Add FluentValidation validators for:
+     CreateProductRequestValidator
+     CreateCustomerRequestValidator
+     AdjustStockRequestValidator
+
+EXIT GATE 3:
+[ ] GET /api/products returns 10 products with correct shapes
+[ ] GET /api/categories returns 7 categories
+[ ] GET /api/products/{id}/stock returns { stockQuantity, reorderLevel, isLowStock }
+[ ] PATCH /api/products/{id}/stock with { "delta": -5 } decrements correctly
+[ ] GET /api/customers returns 5 customers
+[ ] GET /api/customers/{id} returns customer with recentOrders array
+[ ] GET /api/analytics/summary returns all required fields, no nulls
+[ ] GET /api/analytics/orders-over-time?days=30 returns array
+[ ] GET /api/analytics/top-products?limit=10 returns array
+
+════════════════════════════════════════════════════════════════════
+PHASE 4 — MESSAGING CONTRACTS + WORKER PROJECT
+Goal: All event contracts defined, Worker project exists, MassTransit wired
+════════════════════════════════════════════════════════════════════
+
+4.1  Create shared contracts location:
+     Infrastructure/Messaging/Contracts/
+     Create one file per contract from prd-agent-v2.txt Section 14:
+       - OrderCreated.cs
+       - InventoryReserveRequested.cs
+       - InventoryReserved.cs
+       - InventoryFailed.cs
+       - PaymentProcessRequested.cs
+       - PaymentProcessed.cs
+       - PaymentFailed.cs
+       - ShippingDispatchRequested.cs
+       - ShippingDispatched.cs
+       - NotificationSendRequested.cs
+       - NotificationSent.cs
+       - OrderCancelled.cs
+     Each contract must have at minimum:
+       messageId, correlationId, orderId, occurredAt
+     Plus contract-specific fields from prd-agent-v2.txt Section 14
+
+4.2  Add MassTransit + MassTransit.RabbitMQ to Infrastructure
+     Configure in DependencyInjection.cs:
+       builder.AddMassTransit(x =>
+         x.SetKebabCaseEndpointNameFormatter()
+         x.UsingRabbitMq(...)
+         add all consumers
+       )
+
+4.3  Create Infrastructure/Services/ folder:
+     Create stub implementations:
+       - InventoryService.cs (reserve, restore — stub logic for now)
+       - PaymentService.cs (simulate success/fail based on forceFailure flag)
+       - ShippingService.cs (return random shipment ref)
+       - NotificationService.cs (log only)
+
+4.4  Create Infrastructure/Resilience/PolicyRegistry.cs
+     Define named Polly policies:
+       - PaymentCircuitBreaker: break after 3 failures, 30s open duration
+       - DefaultRetry: 3 retries, exponential backoff 1s/2s/4s
+
+4.5  Create Infrastructure/Observability/CircuitBreakerStateMonitor.cs
+     - Singleton
+     - Dictionary<string, CircuitState> per service
+     - Methods: SetState(service, state), GetAll()
+     - Called from Polly callbacks: onBreak, onReset, onHalfOpen
+
+4.6  Create Infrastructure/Caching/RedisService.cs
+     Basic wrapper: Get<T>, Set<T>, Delete, KeyExists
+
+4.7  Create Infrastructure/Caching/LockService.cs
+     DistributedLock using StackExchange.Redis SETNX + expiry
+     Methods: AcquireAsync(key, timeout), ReleaseAsync(key)
+
+EXIT GATE 4:
+[ ] All 12 contract classes compile
+[ ] MassTransit connects to RabbitMQ (check management UI for queues)
+[ ] No consumers active yet but connection established
+[ ] PolicyRegistry compiles, CircuitBreakerStateMonitor singleton registered
+[ ] RedisService.Set/Get works (write a quick test log on startup)
+[ ] LockService compiles
+
+════════════════════════════════════════════════════════════════════
+PHASE 5 — TRANSACTIONAL OUTBOX + PUBLISHER
+Goal: Outbox pattern working end-to-end before saga consumers exist
+════════════════════════════════════════════════════════════════════
+
+5.1  Implement OutboxPublisherService.cs (IHostedService)
+     Loop every OUTBOX_PUBLISH_INTERVAL_MS (default 500):
+       - Query: SELECT * FROM outbox_messages
+                WHERE published_at IS NULL
+                ORDER BY created_at
+                LIMIT OUTBOX_BATCH_SIZE (default 10)
+       - For each row: publish to RabbitMQ using IBus
+         using exchange and routing_key from row
+       - On success: UPDATE published_at = NOW()
+       - On failure: increment retry_count, set last_error
+     Register as IHostedService in Program.cs
+
+5.2  Implement MetricsSnapshotService.cs (IHostedService)
+     Loop every METRICS_SNAPSHOT_INTERVAL_MS (default 1000):
+       - activeSagas: COUNT saga_states WHERE not terminal
+       - outboxPending: COUNT outbox_messages WHERE published_at IS NULL
+       - ordersPerMinute: COUNT orders WHERE created_at > NOW() - 60s
+       - sagaSuccessRate: completed / (completed + cancelled) trailing 24h
+       - p95LatencyMs: computed from completed saga duration_ms percentile
+       - deadLetterCount: read from Redis key dl:count or 0
+       - cpuPercent: Environment.WorkingSet proxy or process metrics
+       - memoryPercent: GC.GetTotalMemory proxy
+       - circuitStates: from CircuitBreakerStateMonitor
+       - activeOrder: latest non-terminal saga_states row
+       - recentLogs: from StreamSnapshotStore rolling buffer
+       Store result in StreamSnapshotStore
+
+5.3  Create Infrastructure/Observability/StreamSnapshotStore.cs
+     - Singleton
+     - Property: CurrentSnapshot (StreamMetricsDto)
+     - Property: RecentLogs (ConcurrentQueue<LogEntry>, max 50)
+     - Method: UpdateSnapshot(StreamMetricsDto)
+     - Method: AppendLog(string level, string service, string message, string correlationId)
+     - Wire Serilog custom sink to call AppendLog on each log event
+
+5.4  Implement StreamController.cs
+     GET /api/stream:
+       - Set Content-Type: text/event-stream
+       - Set Cache-Control: no-cache
+       - Set X-Accel-Buffering: no
+       - Loop: while !cancellationToken.IsCancellationRequested
+           data = StreamSnapshotStore.CurrentSnapshot
+           write: data: {json}\n\n
+           flush
+           await Task.Delay(1000)
+       - Detect disconnect via cancellationToken
+
+5.5  Wire MetricsRegistry.cs (prometheus-net):
+     - Counter: orders_submitted_total
+     - Counter: orders_completed_total
+     - Counter: orders_cancelled_total
+     - Histogram: saga_duration_ms (buckets 100,250,500,1000,2000,5000)
+     - Gauge: outbox_pending_gauge
+     - Gauge: active_sagas_gauge
+     - Gauge: dead_letter_count_gauge
+
+EXIT GATE 5:
+[ ] GET /api/stream returns Content-Type: text/event-stream in browser
+[ ] Network tab shows data: {...} events arriving every ~1 second
+[ ] activeSagas field is a real number (0 at this point, not null)
+[ ] outboxPending is 0 (nothing in outbox yet)
+[ ] ordersPerMinute is 0 (no orders placed yet)
+[ ] GET /metrics shows prometheus counters and gauges with correct names
+[ ] OutboxPublisherService loop runs without crashing (check logs)
+
+════════════════════════════════════════════════════════════════════
+PHASE 6 — ORDER CREATION + SAGA HAPPY PATH
+Goal: POST /api/orders creates order, saga flows to OrderCompleted
+════════════════════════════════════════════════════════════════════
+
+6.1  Implement CreateOrderCommand + CreateOrderCommandHandler
+     Handler must do ALL of the following in ONE DB transaction:
+       a. Validate customer exists
+       b. Validate all products exist and are active
+       c. Compute subtotal, tax, total (server-side)
+       d. Snapshot product_name, sku, unit_price into order items
+       e. Create Order row (status = Submitted)
+       f. Create OrderItem rows
+       g. Create SagaState row (current_state = "Submitted")
+       h. Create SagaEventLog row (event: OrderSubmitted, state: Submitted)
+       i. Create OutboxMessage row:
+            { message_type: "OrderCreated", payload: order+items+correlationId,
+              exchange: "order.events", routing_key: "order.created" }
+       j. SaveChanges() — ALL in one transaction
+     Return CreateOrderResponse (id, correlationId, status, totalAmount, urls)
+     Increment orders_submitted_total Prometheus counter
+
+6.2  Wire POST /api/orders in OrdersController.cs
+     Read X-Force-Failure header, pass to command as ForceFailure enum
+
+6.3  Create GetOrdersQuery + handler (paginated with filters)
+6.4  Create GetOrderByIdQuery + handler (with items + customer)
+6.5  Create GetOrderSagaQuery + handler (saga_states row only)
+6.6  Create GetOrderTraceQuery + handler (saga_event_logs for order)
+6.7  Wire all read endpoints in OrdersController.cs
+
+6.8  Implement CreateDemoOrderCommand + handler
+     - Pick random customer from seeded set
+     - Pick 1-3 random active products
+     - Assign random quantity 1-3 per item
+     - Pick random PaymentMethod from UPI/Card/Wallet
+     - Copy customer address to shippingAddress
+     - Call CreateOrderCommandHandler internally
+     Wire GET /api/orders/demo and POST /api/orders/demo
+
+6.9  Implement CancelOrderCommand + handler
+     - Only allow cancel if status in {Submitted, InventoryChecking}
+     - Set status = OrderCancelled
+     - Write saga event log
+     Wire POST /api/orders/{id}/cancel
+
+6.10 Implement consumers (Choreography pattern via MassTransit):
+
+     OrderCreatedConsumer.cs:
+       - Idempotency: insert inbox_message, skip if duplicate
+       - Check ForceFailure flag from message payload
+       - If ForceFailure=inventory:
+           Update order.status = InventoryFailed → OrderCancelled
+           Update saga: current_state = OrderCancelled, last_error = "Forced inventory failure"
+           Write SagaEventLog entries: InventoryFailed, OrderCancelled
+           Write NO outbox (terminal)
+       - Else:
+           Acquire distributed lock per product (sorted by productId)
+           Check stock sufficient for all items
+           If insufficient:
+               Release all locks
+               Update saga: InventoryFailed → OrderCancelled
+               Write SagaEventLog entries
+           Else:
+               Decrement stock for all items (in transaction)
+               Release all locks
+               Update saga: current_state = InventoryReserved,
+                            inventory_reserved = true
+               Update order.status = InventoryReserved
+               Write SagaEventLog entry
+               Write OutboxMessage for PaymentProcessRequested
+       SaveChanges()
+
+     PaymentProcessRequestedConsumer.cs:
+       - Idempotency check
+       - Update saga: current_state = PaymentProcessing
+       - Update order.status = PaymentProcessing
+       - Write SagaEventLog entry
+       - Check ForceFailure flag OR CircuitBreaker state
+       - If payment circuit is OPEN:
+           failure reason = "Payment circuit open"
+           goto payment failure
+       - Else call PaymentService.ProcessAsync()
+       - If ForceFailure=payment OR PaymentService returns failure:
+           Update saga: current_state = PaymentFailed, last_error = reason
+           Update order.status = PaymentFailed
+           Write SagaEventLog entry
+           Write OutboxMessage for InventoryReleaseRequested
+       - Else:
+           Update saga: current_state = PaymentProcessed, payment_processed = true
+           Update order.status = PaymentProcessed
+           Update order.payment_reference = reference
+           Write SagaEventLog entry
+           Write OutboxMessage for ShippingDispatchRequested
+       SaveChanges()
+
+     InventoryReleaseRequestedConsumer.cs (compensation):
+       - Idempotency check
+       - Restore stock: UPDATE products SET stock_quantity += qty
+       - Write SagaEventLog entry (InventoryReleased)
+       - Update saga: current_state = OrderCancelled
+       - Update order.status = OrderCancelled, cancelled_at = NOW()
+         failure_reason = stored last_error or payment reason
+       - Compute duration_ms if possible
+       - Write SagaEventLog entry (OrderCancelled)
+       - Increment orders_cancelled_total Prometheus counter
+       - No further outbox messages (terminal)
+       SaveChanges()
+
+     ShippingDispatchRequestedConsumer.cs:
+       - Idempotency check
+       - Update saga: current_state = ShippingDispatching
+       - Update order.status = ShippingDispatching
+       - Call ShippingService.DispatchAsync()
+       - Update saga: current_state = ShippingDispatched, shipping_dispatched = true
+       - Update order.status = ShippingDispatched
+       - Write SagaEventLog entries
+       - Write OutboxMessage for NotificationSendRequested
+       SaveChanges()
+
+     NotificationSendRequestedConsumer.cs:
+       - Idempotency check
+       - Call NotificationService.SendAsync() (log only)
+       - Update saga: current_state = OrderCompleted,
+                      notification_sent = true,
+                      completed_at = NOW(),
+                      duration_ms = NOW() - started_at ms
+       - Update order.status = OrderCompleted, completed_at = NOW()
+       - Write SagaEventLog entries (NotificationSent, OrderCompleted)
+       - Increment orders_completed_total Prometheus counter
+       - Record saga_duration_ms histogram observation
+       SaveChanges()
+
+EXIT GATE 6:
+[ ] POST /api/orders with valid body returns 201
+[ ] GET /api/orders/{id}/saga returns correct state projection
+[ ] GET /api/orders/{id}/trace returns ordered event list
+[ ] Saga flows: Submitted → InventoryReserved → PaymentProcessing →
+    PaymentProcessed → ShippingDispatched → OrderCompleted
+    (all within ~3-5 seconds on local docker)
+[ ] saga_states.inventory_reserved, payment_processed, shipping_dispatched,
+    notification_sent all TRUE on completion
+[ ] product stock_quantity decremented by ordered quantity
+[ ] outbox_messages all have published_at set after drain
+[ ] GET /api/orders/demo returns 201 and triggers same saga flow
+[ ] SSE stream shows activeSagas incrementing and decrementing
+[ ] SSE stream shows ordersPerMinute updating after orders placed
+
+════════════════════════════════════════════════════════════════════
+PHASE 7 — FAILURE + COMPENSATION PATHS
+Goal: Both failure paths work and compensate correctly
+════════════════════════════════════════════════════════════════════
+
+7.1  Test inventory failure path:
+     POST /api/orders/demo with X-Force-Failure: inventory
+     Verify:
+       - Order reaches OrderCancelled
+       - failure_reason set
+       - No stock decremented (failure before reservation)
+       - SagaEventLog has InventoryFailed + OrderCancelled entries
+
+7.2  Test payment failure path:
+     POST /api/orders/demo with X-Force-Failure: payment
+     Verify:
+       - Order reaches PaymentFailed then OrderCancelled
+       - Stock WAS decremented (reservation happened)
+       - Stock IS restored by InventoryReleaseRequestedConsumer
+       - failure_reason set
+       - SagaEventLog has InventoryReserved, PaymentFailed,
+         InventoryReleased, OrderCancelled entries
+
+7.3  Test circuit breaker:
+     Trigger 3+ payment failures in sequence
+     Verify:
+       - CircuitBreakerStateMonitor.GetAll()["payment"] = Open
+       - SSE stream circuitStates.payment = "Open"
+       - New payment attempt immediately fails with "Payment circuit open"
+       - After 30s circuit moves to HalfOpen then Closed
+
+7.4  Test idempotency:
+     Send duplicate message to consumer (manual RabbitMQ publish)
+     Verify inbox_messages prevents double-processing
+
+EXIT GATE 7:
+[ ] X-Force-Failure: inventory → OrderCancelled, stock unchanged
+[ ] X-Force-Failure: payment → OrderCancelled, stock restored to original
+[ ] failure_reason is non-null on all cancelled orders
+[ ] Circuit breaker state appears correctly in SSE payload
+[ ] Duplicate message does not create duplicate saga events
+[ ] GET /api/analytics/summary shows correct completed/cancelled counts
+
+════════════════════════════════════════════════════════════════════
+PHASE 8 — INTEGRATION TESTS
+Goal: All required test classes pass against test containers
+════════════════════════════════════════════════════════════════════
+
+8.1  Create project: VyaaparNexus.Tests (xunit)
+     Add: xUnit, Testcontainers, Testcontainers.PostgreSql,
+          Testcontainers.RabbitMq, Testcontainers.Redis,
+          Microsoft.AspNetCore.Mvc.Testing
+
+8.2  Create VyaaparNexusFactory.cs
+     - Extends WebApplicationFactory<Program>
+     - Override ConfigureTestServices
+     - Spin up Postgres, RabbitMQ, Redis containers
+     - Override connection string env vars
+     - Call DatabaseSeeder in Setup
+
+8.3  Create IntegrationTestBase.cs
+     - Shared setup/teardown
+     - HttpClient with X-Api-Key header set
+     - Helper method: PollSagaUntilTerminal(orderId, timeout=30s)
+
+8.4  Write ApiKeyTests.cs (from prd-agent-v2.txt Section 27)
+8.5  Write SeedDataTests.cs
+8.6  Write OrdersApiTests.cs
+8.7  Write HappyPathSagaTests.cs
+8.8  Write PaymentFailureSagaTests.cs
+8.9  Write InventoryFailureSagaTests.cs
+8.10 Write ProductsApiTests.cs
+8.11 Write CustomersApiTests.cs
+8.12 Write AnalyticsTests.cs
+8.13 Write StreamTests.cs
+
+EXIT GATE 8:
+[ ] dotnet test runs all test projects
+[ ] 0 failures, 0 errors
+[ ] HappyPathSagaTests passes (saga reaches OrderCompleted within 30s)
+[ ] PaymentFailureSagaTests passes (saga reaches OrderCancelled, stock restored)
+[ ] InventoryFailureSagaTests passes
+[ ] StreamTests passes (3 parseable events with required fields)
+[ ] CI yml runs the test suite on push to PR branch
+
+════════════════════════════════════════════════════════════════════
+PHASE 9 — FRONTEND SCAFFOLD + INFRA
+Goal: React app running, connected to API, auth working, SSE connected
+════════════════════════════════════════════════════════════════════
+
+9.1  Create apps/web/ with Vite + React + TypeScript template
+     pnpm create vite web --template react-ts
+
+9.2  Install all frontend dependencies:
+     pnpm add tailwindcss @tailwindcss/vite
+     pnpm add @reduxjs/toolkit react-redux
+     pnpm add @tanstack/react-query
+     pnpm add react-router-dom
+     pnpm add axios
+     pnpm add @microsoft/fetch-event-source
+     pnpm add sonner lucide-react
+     pnpm add clsx tailwind-merge
+     pnpm add @tremor/react
+     Install shadcn: npx shadcn@latest init
+
+9.3  Configure TailwindCSS (tailwind.config.ts + postcss.config.js)
+9.4  Configure shadcn (components.json)
+     Install shadcn dashboard-01 block:
+     npx shadcn@latest add dashboard-01
+     Install shadcn components used:
+     button, card, table, badge, sheet, toast, drawer, input, select
+
+9.5  Create packages/shared-types/
+     - index.ts re-exporting all types
+     - order.ts, product.ts, customer.ts, analytics.ts, stream.ts
+     Export all types from prd-agent-v2.txt Section 23
+
+9.6  Create apps/web/src/api/client.ts
+     axios instance with baseURL from VITE_API_URL
+     and X-Api-Key header from VITE_API_KEY
+     No requests possible without these set
+
+9.7  Create apps/web/src/store/index.ts
+     Configure Redux store with metricsSlice, ordersSlice, uiSlice
+
+9.8  Create store slices:
+     metricsSlice.ts — all SSE-fed state fields + connected boolean
+     ordersSlice.ts — items, activeOrderId, selectedOrderId, trace
+     uiSlice.ts — drawer state, error state
+
+9.9  Create useSystemStream.ts hook (REAL SSE, NOT setInterval)
+     Use fetchEventSource from @microsoft/fetch-event-source
+     Send X-Api-Key header
+     dispatch metricsUpdated(JSON.parse(ev.data)) on each event
+     Set connected = true on open, connected = false on error
+     Reconnect with backoff on error
+     Abort on unmount
+
+9.10 Create apps/web/src/main.tsx
+     Wrap app with Provider (Redux) + QueryClientProvider (TanStack Query)
+     + BrowserRouter
+
+9.11 Create React Router routes (Dashboard, Orders, Products, Customers)
+
+9.12 Create apps/web/.env.local and .env.production
+9.13 Create apps/web/vite.config.ts (with proxy to API for local dev)
+
+EXIT GATE 9:
+[ ] pnpm --filter web dev starts frontend on port 5173 with no TS errors
+[ ] Frontend can reach API: GET /api/products returns data
+[ ] SSE connected: browser network tab shows text/event-stream from backend
+[ ] SSE events parse correctly: no console JSON errors
+[ ] Redux DevTools shows metricsSlice updating every second
+[ ] Navigating between routes works without full reload
+
+════════════════════════════════════════════════════════════════════
+PHASE 10 — DASHBOARD PAGE + LIVE METRICS
+Goal: Dashboard page shows real data from backend, all metric cards live
+════════════════════════════════════════════════════════════════════
+
+10.1 Create DashboardShell.tsx (shadcn dashboard-01 as base)
+     - Left sidebar with nav links
+     - Top header with logo + ConnectionBadge
+     - Main content area
+
+10.2 Create ConnectionBadge.tsx
+     - Reads metricsSlice.connected
+     - Green dot + "Live" when true
+     - Red dot + "Disconnected" when false
+
+10.3 Create MetricCards.tsx
+     - 8 Tremor KPI cards in 4-col grid
+     - Data from metricsSlice (SSE fed)
+     - Color thresholds from prd-agent-v2.txt Section 22
+
+10.4 Create ServiceMesh.tsx
+     - 5 nodes: Order, Inventory, Payment, Shipping, Notification
+     - Horizontal row with arrows between nodes
+     - Node status derived from:
+         Poll GET /api/orders/{activeOrderId}/saga every 500ms
+         (activeOrderId from ordersSlice.activeOrderId)
+     - Status → color mapping from prd-agent-v2.txt Section 22
+     - Circuit breaker state overlaid on Payment node from metricsSlice
+
+10.5 Create DemoOrderPanel.tsx
+     - "Place Test Order" button → POST /api/orders/demo
+     - "Force Payment Failure" button → POST /api/orders/demo
+       with X-Force-Failure: payment
+     - "Force Inventory Failure" button → POST /api/orders/demo
+       with X-Force-Failure: inventory
+     - On success: set activeOrderId in ordersSlice, show toast
+     - Loading spinner during mutation
+
+10.6 Create LogTerminal.tsx
+     - Read metricsSlice.recentLogs
+     - Monospace font, dark terminal background
+     - Color code by log level (Info=blue, Warning=amber, Error=red)
+     - Newest at bottom, cap at 50 lines
+     - Auto-scroll to bottom on new entries
+
+10.7 Create SagaTimeline.tsx
+     - Render ordered saga event list for activeOrderId
+     - Fetch GET /api/orders/{id}/trace
+     - Refetch every 1s while saga not terminal
+     - Show event type, service, state, duration_ms, timestamp
+     - Color completed events green, failed events red
+
+10.8 Create Dashboard.tsx page
+     - Mount useSystemStream on mount
+     - Render: MetricCards, ServiceMesh, DemoOrderPanel,
+               SagaTimeline, LogTerminal
+
+EXIT GATE 10:
+[ ] Dashboard loads without any console errors
+[ ] MetricCards show real values from SSE (not all zeros/nulls)
+[ ] SSE connection indicator shows green "Live"
+[ ] Place Test Order button works:
+    - Order created
+    - ServiceMesh nodes animate through states
+    - SagaTimeline shows events appearing in real time
+    - Final state shows OrderCompleted
+[ ] Force Payment Failure shows compensation path on ServiceMesh
+[ ] LogTerminal shows real backend log lines with correlationId
+[ ] All color thresholds applied correctly to metric cards
+
+════════════════════════════════════════════════════════════════════
+PHASE 11 — REMAINING PAGES
+Goal: Orders, Products, Customers pages functional
+════════════════════════════════════════════════════════════════════
+
+11.1 Create OrdersTable.tsx
+     - Paginated table from GET /api/orders
+     - Columns: Order ID, Customer, Items, Total, Status, Time
+     - Status badges with color from prd-agent-v2.txt Section 22
+     - Clicking row sets selectedOrderId in ordersSlice
+     - Auto-refresh every 10 seconds
+
+11.2 Create OrderDetailsDrawer.tsx
+     - Opens on row click
+     - Fetches GET /api/orders/{id} and GET /api/orders/{id}/saga
+     - Shows full order detail including items and current saga state
+
+11.3 Create Orders.tsx page with OrdersTable + OrderDetailsDrawer
+
+11.4 Create ProductsTable.tsx
+     - List from GET /api/products
+     - Show: name, SKU, category, price, stock, active status
+     - Stock level indicator (red if below reorder_level)
+
+11.5 Create Products.tsx page with ProductsTable
+
+11.6 Create CustomersTable.tsx
+     - List from GET /api/customers
+     - Show: name, email, city, state
+
+11.7 Create Customers.tsx page with CustomersTable
+
+11.8 Create charts components:
+     - OrdersOverTimeChart.tsx (Tremor BarChart → GET /api/analytics/orders-over-time)
+     - RevenueChart.tsx (Tremor AreaChart → same endpoint revenue field)
+     - SuccessRateChart.tsx (Tremor LineChart → GET /api/analytics/saga-success-rate)
+     Add charts to Dashboard.tsx below the live metrics section
+
+EXIT GATE 11:
+[ ] Orders page shows seeded/placed orders with correct status badges
+[ ] Clicking an order opens drawer with full detail
+[ ] Products page shows all 10 seeded products with stock levels
+[ ] Customers page shows all 5 seeded customers
+[ ] Charts render with real data (may be sparse if few orders placed)
+[ ] All 4 pages navigable via sidebar with no broken routes
+
+════════════════════════════════════════════════════════════════════
+PHASE 12 — DEPLOYMENT
+Goal: Full stack live on cloud, reachable by public URL
+════════════════════════════════════════════════════════════════════
+
+12.1 Create Supabase project
+     - Get Transaction Pooler connection string (for runtime)
+     - Get Direct connection string (for migrations)
+     - Run: DATABASE_MIGRATION_URL=<direct> dotnet ef database update
+     - Verify tables created in Supabase SQL editor
+     - Verify seed data inserted
+
+12.2 Create CloudAMQP free tier instance
+     - Get AMQPS connection URL
+     - Test locally: set RABBITMQ_URL in local API, restart, verify queues create
+
+12.3 Create Upstash Redis free tier instance
+     - Get REDISS connection string
+     - Test locally: set REDIS_URL, restart
+
+12.4 Create Railway project
+     - Service 1: vyapaar-api (API project)
+     - Service 2: vyapaar-worker (Worker/hosted services, if separated)
+       NOTE: If worker services (OutboxPublisher, MetricsSnapshot, consumers)
+             run as hosted services inside API, only 1 Railway service needed.
+             This is the simpler option — use it unless Railway memory limits force split.
+     - Set all production env vars in Railway dashboard:
+         DATABASE_URL, DATABASE_MIGRATION_URL,
+         RABBITMQ_URL, REDIS_URL,
+         SEED_API_KEY, ASPNETCORE_ENVIRONMENT=Production
+     - Deploy from GitHub main branch
+
+12.5 Deploy frontend to Vercel
+     - Link apps/web as the root directory
+     - Set env vars: VITE_API_URL=<railway api url>, VITE_API_KEY=<demo key>
+     - Trigger deploy
+
+12.6 Wire GitHub Actions:
+     ci.yml:
+       - Trigger: pull_request to main
+       - Steps: checkout, setup dotnet, setup pnpm,
+                docker-in-docker (Testcontainers needs it),
+                dotnet test
+     deploy.yml:
+       - Trigger: push to main
+       - Job 1: deploy frontend to Vercel
+       - Job 2: deploy API to Railway
+       - Secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID,
+                  RAILWAY_TOKEN
+
+12.7 Add GitHub Actions keep-alive cron:
+     - Schedule: 0 */6 * * * (every 6 hours)
+     - Hits: GET {VITE_API_URL}/health/live
+     - Prevents Supabase free tier auto-pause
+
+EXIT GATE 12:
+[ ] Live URL loads dashboard (Vercel)
+[ ] Live URL connects to SSE from Railway API (check network tab)
+[ ] POST /api/orders/demo on live URL creates order and saga completes
+[ ] Force failure paths work on live URL
+[ ] CI runs on PR and passes integration tests
+[ ] Deployment runs on push to main
+[ ] Keep-alive cron in GitHub Actions scheduled workflows
+
+════════════════════════════════════════════════════════════════════
+PHASE 13 — POLISH AND VERIFICATION
+Goal: Full acceptance checklist from prd-agent-v2.txt Section 31 passes
+════════════════════════════════════════════════════════════════════
+
+13.1 Run full acceptance checklist from prd-agent-v2.txt Section 31
+13.2 Open browser DevTools on live URL:
+     - Network tab: verify text/event-stream connection is live and sustained
+     - Network tab: verify no 401 or 500 errors on page load
+     - Console: verify 0 errors
+13.3 Check SSE payload manually:
+     - Every required field present
+     - No null values on required numeric fields
+     - circuitStates object has all 4 service keys
+     - activeOrder is null when no saga running, populated when active
+     - recentLogs array has entries after placing an order
+13.4 Place 5 consecutive test orders, verify:
+     - ordersPerMinute updates in metric card
+     - sagaSuccessRate updates in metric card
+     - All 5 reach OrderCompleted
+     - Stock decrements correctly across multiple orders
+13.5 Trigger payment failure 3 times back to back, verify:
+     - Circuit state moves to Open in SSE payload
+     - Payment node in ServiceMesh turns red with OPEN badge
+13.6 Verify analytics endpoints return correct aggregates based on placed orders
+13.7 Run dotnet test one final time — 0 failures required
+
+EXIT GATE 13 (FINAL GATE):
+[ ] All items in prd-agent-v2.txt Section 31 acceptance checklist checked
+[ ] 0 browser console errors on live URL
+[ ] SSE sustained for 60+ seconds without disconnect
+[ ] 5 successive demo orders all complete successfully
+[ ] Payment circuit breaker open/close cycle works end-to-end
+[ ] dotnet test: 0 failures
+[ ] No Math.random or hardcoded fake data anywhere in codebase
+    (grep the repo: rg "Math.random" — must return no results in src files)
+
+════════════════════════════════════════════════════════════════════
+PHASE SUMMARY TABLE
+════════════════════════════════════════════════════════════════════
+
+Phase  | Name                          | Estimated Sessions
+-------|-------------------------------|--------------------
+0      | Workspace Bootstrap           | 1
+1      | Domain + Database             | 1-2
+2      | API Skeleton + Auth           | 1
+3      | Products + Customers + Analytics | 1-2
+4      | Messaging Contracts + Worker  | 1
+5      | Outbox + SSE Stream           | 1-2
+6      | Order Creation + Saga Happy   | 2-3
+7      | Failure + Compensation Paths  | 1
+8      | Integration Tests             | 2
+9      | Frontend Scaffold             | 1
+10     | Dashboard + Live Metrics      | 2
+11     | Remaining Pages               | 1
+12     | Deployment                    | 1-2
+13     | Polish + Verification         | 1
+-------|-------------------------------|--------------------
+Total                                  | 17-22 sessions
+
+════════════════════════════════════════════════════════════════════
+BUILD ORDER RULES (REPEAT FOR AGENT)
+════════════════════════════════════════════════════════════════════
+
+1. Never build frontend components before the API endpoint they consume exists.
+2. Never build saga consumers before message contracts are defined.
+3. Never build message contracts before domain entities and DB are ready.
+4. Never skip an exit gate — each exit gate is a forcing function to prevent
+   compounding broken state.
+5. When in doubt about a spec, refer to prd-agent-v2.txt — it is the truth.
+6. The SSE stream must be working with real data BEFORE the frontend
+   SSE hook is written — never build the consumer before the source.
+
+════════════════════════════════════════════════════════════════════
+END OF BUILD ORDER PLAN
+════════════════════════════════════════════════════════════════════

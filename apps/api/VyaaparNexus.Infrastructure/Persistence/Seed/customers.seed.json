@@ -1,0 +1,58 @@
+[
+  {
+    "id": "e0d0b000-0000-0000-0000-000000000001",
+    "name": "Rahul Sharma",
+    "email": "rahul.sharma@example.com",
+    "phone": "+91-9876543210",
+    "addressLine1": "101, MG Road",
+    "addressLine2": "Near Town Hall",
+    "city": "Indore",
+    "state": "Madhya Pradesh",
+    "pincode": "452001",
+    "country": "India"
+  },
+  {
+    "id": "e0d0b000-0000-0000-0000-000000000002",
+    "name": "Priya Singh",
+    "email": "priya.singh@example.com",
+    "phone": "+91-9876543211",
+    "addressLine1": "202, FC Road",
+    "city": "Pune",
+    "state": "Maharashtra",
+    "pincode": "411004",
+    "country": "India"
+  },
+  {
+    "id": "e0d0b000-0000-0000-0000-000000000003",
+    "name": "Amit Patel",
+    "email": "amit.patel@example.com",
+    "phone": "+91-9876543212",
+    "addressLine1": "303, Andheri West",
+    "city": "Mumbai",
+    "state": "Maharashtra",
+    "pincode": "400053",
+    "country": "India"
+  },
+  {
+    "id": "e0d0b000-0000-0000-0000-000000000004",
+    "name": "Neha Desai",
+    "email": "neha.desai@example.com",
+    "phone": "+91-9876543213",
+    "addressLine1": "404, SG Highway",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "380015",
+    "country": "India"
+  },
+  {
+    "id": "e0d0b000-0000-0000-0000-000000000005",
+    "name": "Karthik Iyer",
+    "email": "karthik.iyer@example.com",
+    "phone": "+91-9876543214",
+    "addressLine1": "505, T Nagar",
+    "city": "Chennai",
+    "state": "Tamil Nadu",
+    "pincode": "600017",
+    "country": "India"
+  }
+]
