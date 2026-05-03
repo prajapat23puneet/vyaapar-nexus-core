@@ -4,3 +4,5 @@ obj
 *.env
 *.user
 repomix-output.xml
+.vscode/
+.gitignore
