@@ -1,0 +1,2426 @@
+════════════════════════════════════════════════════════════════════
+VYAAPARNEXUS v2 — AGENT PRD
+FOR: GOOGLE ANTIGRAVITY AI AGENT
+MODE: BUILD FINAL PRODUCT FROM SCRATCH
+VERSION: 2.0
+DATE: 2026-05-03
+════════════════════════════════════════════════════════════════════
+
+IMPORTANT:
+- Build ONLY the final product state.
+- Do NOT preserve, inspect, migrate, or adapt any prior repo code.
+- Do NOT generate fake metrics, fake SSE, fake logs, fake service mesh state, or Math.random()-based UI state.
+- Every feature must map to a real backend source of truth.
+- Use code snippets only where needed for clarity. Do not expand into full file dumps unless necessary.
+- Prefer explicit contracts, schemas, function responsibilities, and file ownership.
+- Optimize for correctness, production-grade clarity, and zero ambiguity.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+0. PRODUCT GOAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Project name: VyaaparNexus
+
+One-line definition:
+A live distributed e-commerce order orchestrator where a user can place a demo order, watch a real multi-step saga complete in real time, and trigger controlled failure paths to observe compensating transactions, backpressure, and resilience behavior.
+
+Primary demo outcomes:
+1. User visits live dashboard.
+2. User clicks "Place Demo Order".
+3. Backend creates a real order, persists saga state, writes outbox messages, publishes events via RabbitMQ.
+4. Frontend receives real SSE updates and shows:
+   - active saga count
+   - current service step
+   - orders/min
+   - p95 latency
+   - outbox pending
+   - dead letters
+   - circuit state
+5. User can trigger:
+   - payment failure
+   - inventory failure
+6. System shows correct compensation path, updates DB, restores stock where required, marks terminal status.
+
+Non-goals:
+- No user login/auth system
+- No payment gateway integration
+- No real shipping provider integration
+- No email sending
+- No admin CMS
+- No multi-tenant support
+- No Kubernetes
+- No paid services
+- No E2E browser automation tests
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. LOCKED TECH STACK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Backend:
+- .NET 8
+- ASP.NET Core Web API
+- Entity Framework Core 8
+- Npgsql
+- MassTransit 8
+- RabbitMQ
+- PostgreSQL 16 on Supabase
+- Redis via Upstash
+- Serilog
+- OpenTelemetry
+- prometheus-net
+- Polly v8
+- MediatR
+- FluentValidation
+
+Frontend:
+- React 18
+- TypeScript 5
+- Vite 5
+- TailwindCSS v3
+- shadcn/ui
+- Tremor
+- Redux Toolkit
+- TanStack Query v5
+- React Router v6
+- axios
+- @microsoft/fetch-event-source
+- sonner
+- lucide-react
+
+Infra:
+- Monorepo
+- pnpm workspaces
+- Turborepo
+- Docker Compose local dev
+- Vercel frontend
+- Railway backend services
+- Supabase Postgres
+- CloudAMQP RabbitMQ
+- Upstash Redis
+- Grafana Cloud free tier
+- Jaeger local only
+
+Testing:
+- Integration tests only
+- xUnit
+- Testcontainers.NET
+- WebApplicationFactory
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. UX AND VISUAL DIRECTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Overall visual direction:
+- Vercel + Resend style for layout, dark surfaces, spacing, hierarchy
+- Grafana-inspired log terminal
+- Tremor block style for metrics
+- shadcn dashboard shell
+- No glassmorphism
+- No flashy gradients that reduce seriousness
+- Minimal, product-grade, infra-tool aesthetic
+
+Key UI principles:
+- Dark theme first
+- Dense but readable
+- Metrics visible above the fold
+- Order journey visible without navigation friction
+- Failure states visually stronger than success states
+- Every number must be traceable to a real backend metric or query
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. HIGH-LEVEL SYSTEM MODEL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Main runtime components:
+1. Web frontend
+2. API service
+3. Worker service
+4. PostgreSQL
+5. RabbitMQ
+6. Redis
+7. Metrics/health/telemetry surface
+
+Logical domain flow:
+- Order submission starts in API
+- API persists order + items + saga state + outbox in one transaction
+- Background outbox publisher publishes integration event to RabbitMQ
+- Worker consumers process saga stages
+- Each stage updates business state and saga state
+- Metrics snapshot service aggregates system metrics
+- SSE endpoint streams current metrics and active saga state to frontend
+
+Canonical service sequence:
+Order → Inventory → Payment → Shipping → Notification → Completed
+
+Failure branches:
+- Inventory failure before reservation finalization
+- Payment failure after inventory reservation, requiring compensation
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. MONOREPO STRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Root layout:
+
+vyapaar-nexus/
+  package.json
+  pnpm-workspace.yaml
+  turbo.json
+  .gitignore
+  .editorconfig
+  .github/
+    workflows/
+      ci.yml
+      deploy.yml
+  apps/
+    web/
+    api/
+  packages/
+    shared-types/
+  infra/
+    docker-compose.yml
+    docker-compose.prod.yml
+    .env.example
+  docs/
+    adr/
+      001-saga-over-2pc.md
+      002-transactional-outbox.md
+      003-api-key-auth-over-public-write-endpoints.md
+
+Frontend root:
+apps/web/
+  package.json
+  index.html
+  vite.config.ts
+  tsconfig.json
+  tailwind.config.ts
+  postcss.config.js
+  components.json
+  src/
+    main.tsx
+    App.tsx
+    routes/
+      index.tsx
+    pages/
+      Dashboard.tsx
+      Orders.tsx
+      Products.tsx
+      Customers.tsx
+    components/
+      ui/...
+      layout/
+        AppSidebar.tsx
+        AppHeader.tsx
+        DashboardShell.tsx
+      dashboard/
+        MetricCards.tsx
+        ServiceMesh.tsx
+        SagaTimeline.tsx
+        DemoOrderPanel.tsx
+        LogTerminal.tsx
+        ConnectionBadge.tsx
+      orders/
+        OrdersTable.tsx
+        OrderDetailsDrawer.tsx
+      products/
+        ProductsTable.tsx
+      customers/
+        CustomersTable.tsx
+      charts/
+        OrdersOverTimeChart.tsx
+        RevenueChart.tsx
+        SuccessRateChart.tsx
+    hooks/
+      useSystemStream.ts
+      useOrders.ts
+      useProducts.ts
+      useCustomers.ts
+      useAnalytics.ts
+    api/
+      client.ts
+      orders.ts
+      products.ts
+      customers.ts
+      analytics.ts
+      stream.ts
+    store/
+      index.ts
+      metricsSlice.ts
+      ordersSlice.ts
+      uiSlice.ts
+    lib/
+      utils.ts
+      formatters.ts
+      constants.ts
+      status-colors.ts
+    types/
+      ui.ts
+
+Backend root:
+apps/api/
+  VyaaparNexus.sln
+  Directory.Packages.props
+  src/
+    VyaaparNexus.API/
+      Program.cs
+      appsettings.json
+      appsettings.Development.json
+      appsettings.Production.json
+      Controllers/
+        OrdersController.cs
+        ProductsController.cs
+        CustomersController.cs
+        AnalyticsController.cs
+        StreamController.cs
+        HealthController.cs
+      Middleware/
+        ApiKeyMiddleware.cs
+        CorrelationMiddleware.cs
+        ExceptionHandlingMiddleware.cs
+      Extensions/
+        ServiceCollectionExtensions.cs
+        ApplicationBuilderExtensions.cs
+    VyaaparNexus.Application/
+      DependencyInjection.cs
+      DTOs/
+      Commands/
+      Queries/
+      Validators/
+      Interfaces/
+    VyaaparNexus.Domain/
+      Entities/
+      Enums/
+      ValueObjects/
+      Constants/
+    VyaaparNexus.Infrastructure/
+      DependencyInjection.cs
+      Persistence/
+        AppDbContext.cs
+        Configurations/
+        Migrations/
+        Seed/
+          products.seed.json
+          customers.seed.json
+          DatabaseSeeder.cs
+      Messaging/
+        Contracts/
+        Consumers/
+        Publishers/
+        Saga/
+      HostedServices/
+        OutboxPublisherService.cs
+        MetricsSnapshotService.cs
+      Caching/
+        RedisService.cs
+        LockService.cs
+      Observability/
+        MetricsRegistry.cs
+        StreamSnapshotStore.cs
+        CircuitBreakerStateMonitor.cs
+      Resilience/
+        PolicyRegistry.cs
+      Services/
+        InventoryService.cs
+        PaymentService.cs
+        ShippingService.cs
+        NotificationService.cs
+        AnalyticsService.cs
+  tests/
+    VyaaparNexus.Tests/
+      VyaaparNexus.Tests.csproj
+      Infrastructure/
+        VyaaparNexusFactory.cs
+        IntegrationTestBase.cs
+      Api/
+        ApiKeyTests.cs
+        OrdersApiTests.cs
+        ProductsApiTests.cs
+        CustomersApiTests.cs
+        StreamTests.cs
+        AnalyticsTests.cs
+      Saga/
+        HappyPathSagaTests.cs
+        PaymentFailureSagaTests.cs
+        InventoryFailureSagaTests.cs
+      Seed/
+        SeedDataTests.cs
+
+Shared package:
+packages/shared-types/
+  package.json
+  src/
+    index.ts
+    order.ts
+    product.ts
+    customer.ts
+    analytics.ts
+    stream.ts
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. DOMAIN MODEL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Primary entities:
+- Customer
+- Category
+- Product
+- Order
+- OrderItem
+- SagaState
+- SagaEventLog
+- OutboxMessage
+- InboxMessage
+- ApiKey
+- MetricsSnapshot
+
+Value objects:
+- ShippingAddress
+- Money-like decimal fields are plain decimal columns, not a dedicated value object
+- CorrelationId is UUID
+- FailureReason is nullable string
+
+Enums:
+- OrderStatus
+- PaymentMethod
+- SagaEventType
+- CircuitState
+
+OrderStatus enum values:
+- Submitted
+- InventoryChecking
+- InventoryReserved
+- InventoryFailed
+- PaymentProcessing
+- PaymentProcessed
+- PaymentFailed
+- ShippingDispatching
+- ShippingDispatched
+- NotificationSending
+- OrderCompleted
+- OrderCancelled
+
+PaymentMethod enum values:
+- UPI
+- Card
+- Wallet
+- COD
+
+CircuitState enum values:
+- Closed
+- Open
+- HalfOpen
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. DATABASE DESIGN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Database provider:
+- PostgreSQL 16 on Supabase
+
+Connection strategy:
+- API runtime uses Supabase Transaction Pooler connection string
+- Migrations and EF tooling use direct/session connection string
+- Use two env vars:
+  - DATABASE_URL
+  - DATABASE_MIGRATION_URL
+
+All timestamps:
+- TIMESTAMPTZ
+- Store UTC only
+
+All IDs:
+- UUID
+
+Required tables:
+1. customers
+2. categories
+3. products
+4. orders
+5. order_items
+6. saga_states
+7. saga_event_logs
+8. outbox_messages
+9. inbox_messages
+10. api_keys
+11. metrics_snapshots
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6.1 customers
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Stores demo customers used by manual and demo order flows.
+
+Columns:
+- id UUID PK
+- name VARCHAR(120) NOT NULL
+- email VARCHAR(200) NOT NULL UNIQUE
+- phone VARCHAR(20) NOT NULL
+- address_line1 VARCHAR(255) NOT NULL
+- address_line2 VARCHAR(255) NULL
+- city VARCHAR(80) NOT NULL
+- state VARCHAR(80) NOT NULL
+- pincode VARCHAR(10) NOT NULL
+- country VARCHAR(60) NOT NULL DEFAULT 'India'
+- created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+- updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+Indexes:
+- unique(email)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6.2 categories
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Categorizes seeded products.
+
+Columns:
+- id UUID PK
+- name VARCHAR(80) NOT NULL UNIQUE
+- slug VARCHAR(80) NOT NULL UNIQUE
+- description VARCHAR(300) NULL
+- created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6.3 products
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Stores inventory-backed purchasable items.
+
+Columns:
+- id UUID PK
+- category_id UUID NOT NULL FK categories(id)
+- sku VARCHAR(50) NOT NULL UNIQUE
+- name VARCHAR(200) NOT NULL
+- description TEXT NOT NULL
+- brand VARCHAR(100) NOT NULL
+- unit_price NUMERIC(10,2) NOT NULL CHECK > 0
+- stock_quantity INT NOT NULL DEFAULT 0
+- reorder_level INT NOT NULL DEFAULT 10
+- image_url VARCHAR(500) NULL
+- is_active BOOLEAN NOT NULL DEFAULT TRUE
+- weight_grams INT NOT NULL DEFAULT 0
+- tags TEXT[] NULL
+- created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+- updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+Indexes:
+- unique(sku)
+- idx_products_category(category_id)
+- partial optional index on is_active if needed
+
+Inventory constraints:
+- stock_quantity must never go negative
+- inventory reservation must occur under distributed lock + transactional update
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6.4 orders
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Primary business record.
+
+Columns:
+- id UUID PK
+- correlation_id UUID NOT NULL UNIQUE
+- customer_id UUID NOT NULL FK customers(id)
+- status VARCHAR(50) NOT NULL
+- subtotal NUMERIC(10,2) NOT NULL
+- tax_amount NUMERIC(10,2) NOT NULL DEFAULT 0
+- shipping_amount NUMERIC(10,2) NOT NULL DEFAULT 0
+- total_amount NUMERIC(10,2) NOT NULL
+- shipping_address JSONB NOT NULL
+- payment_method VARCHAR(50) NOT NULL
+- payment_reference VARCHAR(200) NULL
+- failure_reason TEXT NULL
+- created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+- updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+- completed_at TIMESTAMPTZ NULL
+- cancelled_at TIMESTAMPTZ NULL
+
+Indexes:
+- unique(correlation_id)
+- idx_orders_customer(customer_id)
+- idx_orders_status(status)
+- idx_orders_created(created_at desc)
+
+shipping_address JSON shape:
+{
+  "line1": "string",
+  "line2": "string|null",
+  "city": "string",
+  "state": "string",
+  "pincode": "string",
+  "country": "string"
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6.5 order_items
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Line items belonging to order.
+
+Columns:
+- id UUID PK
+- order_id UUID NOT NULL FK orders(id) ON DELETE CASCADE
+- product_id UUID NOT NULL FK products(id)
+- product_name VARCHAR(200) NOT NULL
+- sku VARCHAR(50) NOT NULL
+- unit_price NUMERIC(10,2) NOT NULL
+- quantity INT NOT NULL CHECK > 0
+- line_total NUMERIC(10,2) NOT NULL generated or computed server-side
+
+Indexes:
+- idx_order_items_order(order_id)
+
+Important:
+- Snapshot product_name, sku, unit_price into line item at purchase time
+- Do not rely on future product changes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6.6 saga_states
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Current state projection for each order saga.
+
+Columns:
+- id UUID PK
+- order_id UUID NOT NULL FK orders(id)
+- correlation_id UUID NOT NULL UNIQUE
+- current_state VARCHAR(50) NOT NULL
+- inventory_reserved BOOLEAN NOT NULL DEFAULT FALSE
+- payment_processed BOOLEAN NOT NULL DEFAULT FALSE
+- shipping_dispatched BOOLEAN NOT NULL DEFAULT FALSE
+- notification_sent BOOLEAN NOT NULL DEFAULT FALSE
+- started_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+- completed_at TIMESTAMPTZ NULL
+- duration_ms INT NULL
+- last_error TEXT NULL
+
+Indexes:
+- unique(correlation_id)
+- idx_saga_active(current_state) where current_state not in terminal states
+- idx_saga_order(order_id)
+
+Terminal states:
+- OrderCompleted
+- OrderCancelled
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6.7 saga_event_logs
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Immutable trace log for every saga transition and important lifecycle step.
+
+Columns:
+- id UUID PK
+- correlation_id UUID NOT NULL
+- order_id UUID NOT NULL FK orders(id)
+- event_type VARCHAR(100) NOT NULL
+- service_name VARCHAR(80) NOT NULL
+- previous_state VARCHAR(50) NULL
+- current_state VARCHAR(50) NOT NULL
+- message TEXT NULL
+- duration_ms INT NULL
+- created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+- metadata JSONB NULL
+
+Indexes:
+- idx_saga_event_logs_correlation(correlation_id, created_at)
+- idx_saga_event_logs_order(order_id, created_at)
+
+Use:
+- GET /api/orders/{id}/trace
+- timeline rendering
+- debugging
+- latency calculation
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6.8 outbox_messages
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Transactional Outbox for guaranteed message publication.
+
+Columns:
+- id UUID PK
+- correlation_id UUID NOT NULL
+- message_type VARCHAR(200) NOT NULL
+- payload JSONB NOT NULL
+- exchange VARCHAR(200) NOT NULL
+- routing_key VARCHAR(200) NOT NULL
+- created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+- published_at TIMESTAMPTZ NULL
+- retry_count INT NOT NULL DEFAULT 0
+- last_error TEXT NULL
+
+Indexes:
+- idx_outbox_unpublished(created_at) where published_at is null
+- idx_outbox_correlation(correlation_id)
+
+Behavior:
+- API and consumers write outbox messages in same transaction as domain state changes
+- background publisher drains pending rows in batches
+- rows remain for audit even after publish
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6.9 inbox_messages
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Idempotency guard for consumers.
+
+Columns:
+- id UUID PK
+- message_id VARCHAR(200) NOT NULL UNIQUE
+- consumer_name VARCHAR(200) NOT NULL
+- correlation_id UUID NULL
+- processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+Indexes:
+- unique(message_id)
+- idx_inbox_consumer(consumer_name, processed_at desc)
+
+Behavior:
+- Before consuming a message, consumer checks if message_id already processed
+- If yes, short-circuit and ack
+- If no, process and insert row in same transaction if feasible
+
+Idempotency key:
+- Prefer broker message ID if available
+- else deterministic contract field + correlation id + consumer name hash
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6.10 api_keys
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Simple write-protection and demo security.
+
+Columns:
+- id UUID PK
+- key_hash VARCHAR(64) NOT NULL UNIQUE
+- name VARCHAR(100) NOT NULL
+- is_active BOOLEAN NOT NULL DEFAULT TRUE
+- created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+- last_used TIMESTAMPTZ NULL
+
+Seed:
+- one demo key
+
+Plaintext seed:
+- vyaaparnexus-demo-key-2026
+
+Store only SHA-256 hash in DB.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6.11 metrics_snapshots
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Short-lived snapshot table for SSE/dashboard historical aggregation if needed.
+
+Columns:
+- id UUID PK
+- active_sagas INT NOT NULL
+- dead_letter_count INT NOT NULL
+- outbox_pending INT NOT NULL
+- orders_per_minute NUMERIC(10,2) NOT NULL
+- saga_success_rate NUMERIC(5,4) NOT NULL
+- p95_latency_ms INT NOT NULL
+- cpu_percent NUMERIC(5,2) NOT NULL
+- memory_percent NUMERIC(5,2) NOT NULL
+- created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+Indexes:
+- idx_metrics_snapshots_created(created_at desc)
+
+Retention:
+- optional cleanup job
+- keep last 7 days max
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. SEED DATA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Seed strategy:
+- Seed categories, products, customers, and api key on startup if tables empty
+- Keep product and customer seed in JSON files
+- Seeder must be idempotent
+
+Required customer count:
+- 5
+
+Required customer cities:
+- Indore
+- Pune
+- Mumbai
+- Ahmedabad
+- Chennai
+
+Required product count:
+- 10 minimum
+
+Suggested categories:
+- Audio
+- Electronics
+- Grocery
+- Sports
+- HomeKitchen
+- Fashion
+- Books
+
+Products must be realistic Indian-market items, with price, SKU, stock, tags.
+
+Demo order generation:
+- random customer from seeded set
+- random 1 to 3 active products
+- random quantity 1 to 3
+- shipping address copied from customer
+- payment method random from UPI/Card/Wallet
+- do not use COD in auto-demo flow unless explicitly wanted
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. API AUTH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Header:
+X-Api-Key: <plaintext key>
+
+Rules:
+- Required on every /api/* endpoint except health and metrics if desired
+- Required on SSE endpoint too
+- Frontend sends key on axios and fetch-event-source
+- Missing key => 401
+- Invalid key => 401
+- Inactive key => 401
+
+Hashing flow:
+1. Read header
+2. SHA-256 hash plaintext
+3. Compare against api_keys.key_hash
+4. On success update last_used
+
+Do not:
+- hardcode accepted plaintext key in middleware
+- bypass auth for demo order endpoint
+- expose hash in any API response
+
+Canonical error:
+{
+  "error": "Invalid API key"
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9. ORDER SUBMISSION CONTRACTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Base URL:
+<api-base>/api
+
+All responses JSON unless noted.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9.1 POST /api/orders
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Create a real order and initiate saga.
+
+Headers:
+- X-Api-Key required
+- X-Force-Failure optional: payment | inventory
+
+Request body:
+{
+  "customerId": "uuid",
+  "paymentMethod": "UPI",
+  "shippingAddress": {
+    "line1": "42 Vijay Nagar",
+    "line2": "Near Market",
+    "city": "Indore",
+    "state": "Madhya Pradesh",
+    "pincode": "452010",
+    "country": "India"
+  },
+  "items": [
+    {
+      "productId": "uuid",
+      "quantity": 2
+    }
+  ]
+}
+
+Validation:
+- customerId required and must exist
+- paymentMethod required and valid enum
+- shippingAddress required
+- items required, min 1
+- each item.productId required and must exist
+- each quantity >= 1
+- product must be active
+- no duplicate productId entries in single request; merge or reject consistently
+- totals must be computed on server, not trusted from client
+
+Success response 201:
+{
+  "id": "uuid",
+  "correlationId": "uuid",
+  "status": "Submitted",
+  "subtotal": 2598.00,
+  "taxAmount": 0.00,
+  "shippingAmount": 0.00,
+  "totalAmount": 2598.00,
+  "createdAt": "2026-05-03T11:00:00Z",
+  "traceUrl": "/api/orders/{id}/trace",
+  "sagaUrl": "/api/orders/{id}/saga"
+}
+
+Failure responses:
+- 400 invalid payload
+- 404 customer or product missing
+- 409 invalid product state if inactive
+- 401 invalid key
+- 500 unexpected
+
+Error shape:
+{
+  "error": "Validation failed",
+  "details": {
+    "items[0].quantity": ["Quantity must be greater than 0"]
+  }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9.2 GET /api/orders
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Paginated order list.
+
+Query params:
+- page default 1
+- size default 20 max 100
+- status optional
+- customerId optional
+- sort optional createdAt_desc default
+
+Response:
+{
+  "items": [
+    {
+      "id": "uuid",
+      "correlationId": "uuid",
+      "customerName": "Arjun Sharma",
+      "itemCount": 2,
+      "totalAmount": 2598.00,
+      "status": "PaymentProcessing",
+      "failureReason": null,
+      "createdAt": "2026-05-03T11:00:00Z",
+      "updatedAt": "2026-05-03T11:00:03Z"
+    }
+  ],
+  "page": 1,
+  "size": 20,
+  "total": 42,
+  "totalPages": 3
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9.3 GET /api/orders/{id}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Detailed order view.
+
+Response:
+{
+  "id": "uuid",
+  "correlationId": "uuid",
+  "customer": {
+    "id": "uuid",
+    "name": "Arjun Sharma",
+    "email": "arjun@example.com"
+  },
+  "status": "ShippingDispatched",
+  "paymentMethod": "UPI",
+  "paymentReference": "PAY-demo-123",
+  "shippingAddress": {
+    "line1": "...",
+    "line2": null,
+    "city": "Indore",
+    "state": "Madhya Pradesh",
+    "pincode": "452010",
+    "country": "India"
+  },
+  "items": [
+    {
+      "productId": "uuid",
+      "productName": "boAt Rockerz 450 Bluetooth Headphone",
+      "sku": "AUD-BOAT-450",
+      "unitPrice": 1299.00,
+      "quantity": 2,
+      "lineTotal": 2598.00
+    }
+  ],
+  "subtotal": 2598.00,
+  "taxAmount": 0.00,
+  "shippingAmount": 0.00,
+  "totalAmount": 2598.00,
+  "failureReason": null,
+  "createdAt": "...",
+  "updatedAt": "...",
+  "completedAt": null,
+  "cancelledAt": null
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9.4 GET /api/orders/{id}/saga
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Current saga projection only, optimized for service mesh polling.
+
+Response:
+{
+  "orderId": "uuid",
+  "correlationId": "uuid",
+  "currentState": "PaymentProcessing",
+  "inventoryReserved": true,
+  "paymentProcessed": false,
+  "shippingDispatched": false,
+  "notificationSent": false,
+  "startedAt": "2026-05-03T11:00:00Z",
+  "completedAt": null,
+  "durationMs": null,
+  "lastError": null
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9.5 GET /api/orders/{id}/trace
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Full timeline of saga events.
+
+Response:
+{
+  "orderId": "uuid",
+  "correlationId": "uuid",
+  "events": [
+    {
+      "eventType": "OrderSubmitted",
+      "serviceName": "API",
+      "previousState": null,
+      "currentState": "Submitted",
+      "message": "Order persisted and outbox message written",
+      "durationMs": 12,
+      "createdAt": "2026-05-03T11:00:00Z",
+      "metadata": null
+    },
+    {
+      "eventType": "InventoryReserved",
+      "serviceName": "Inventory",
+      "previousState": "InventoryChecking",
+      "currentState": "InventoryReserved",
+      "message": "Stock reserved successfully",
+      "durationMs": 18,
+      "createdAt": "2026-05-03T11:00:01Z",
+      "metadata": {
+        "reservedItems": 2
+      }
+    }
+  ]
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9.6 POST /api/orders/{id}/cancel
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Manual cancel if order not terminal.
+
+Behavior:
+- if already completed/cancelled => 409
+- if allowed, mark cancelled and append saga event
+- for this product, manual cancel may be limited to early states only
+
+Prefer rule:
+- allow only while status in Submitted or InventoryChecking
+- reject if inventory already reserved or later to avoid partial compensation complexity through manual endpoint
+
+Success:
+{
+  "id": "uuid",
+  "status": "OrderCancelled",
+  "cancelledAt": "2026-05-03T11:05:00Z"
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9.7 POST /api/orders/demo
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Generate and submit a randomized valid order using seeded data.
+
+Headers:
+- X-Api-Key required
+- X-Force-Failure optional: payment | inventory
+
+No request body.
+
+Response:
+Same as POST /api/orders, plus optional generated demo context:
+{
+  "id": "uuid",
+  "correlationId": "uuid",
+  "status": "Submitted",
+  "customerName": "Priya Desai",
+  "itemCount": 3,
+  "totalAmount": 3478.00,
+  "createdAt": "...",
+  "traceUrl": "/api/orders/{id}/trace",
+  "sagaUrl": "/api/orders/{id}/saga"
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10. PRODUCTS CONTRACTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10.1 GET /api/products
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+List active products.
+
+Query params:
+- page
+- size
+- category optional
+- search optional
+- includeInactive optional false default
+
+Response:
+{
+  "items": [
+    {
+      "id": "uuid",
+      "categoryId": "uuid",
+      "categoryName": "Audio",
+      "sku": "AUD-BOAT-450",
+      "name": "boAt Rockerz 450 Bluetooth Headphone",
+      "description": "string",
+      "brand": "boAt",
+      "unitPrice": 1299.00,
+      "stockQuantity": 148,
+      "reorderLevel": 10,
+      "imageUrl": "https://...",
+      "isActive": true,
+      "weightGrams": 350,
+      "tags": ["audio","bluetooth","headphones"],
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ],
+  "page": 1,
+  "size": 20,
+  "total": 10,
+  "totalPages": 1
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10.2 GET /api/products/{id}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Response:
+Single product object matching list shape.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10.3 POST /api/products
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Manual product creation for completeness.
+
+Request:
+{
+  "categoryId": "uuid",
+  "sku": "HOME-PRESTIGE-3L",
+  "name": "Prestige Pressure Cooker 3L",
+  "description": "string",
+  "brand": "Prestige",
+  "unitPrice": 1150.00,
+  "stockQuantity": 40,
+  "reorderLevel": 10,
+  "imageUrl": "https://...",
+  "weightGrams": 2200,
+  "tags": ["kitchen","cooker","home"]
+}
+
+Response 201:
+created product
+
+Validation:
+- all fields required except imageUrl and tags
+- sku unique
+- category must exist
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10.4 PUT /api/products/{id}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Full update, same schema as create.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10.5 DELETE /api/products/{id}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Soft delete only:
+- set is_active = false
+- never hard delete if referenced by order_items
+
+Response:
+204 or 200 with updated status, choose consistently
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10.6 GET /api/products/{id}/stock
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Response:
+{
+  "productId": "uuid",
+  "stockQuantity": 148,
+  "reorderLevel": 10,
+  "isLowStock": false
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10.7 PATCH /api/products/{id}/stock
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Request:
+{
+  "delta": -5
+}
+
+Rules:
+- cannot reduce below zero
+- append audit log event if desired
+- update updated_at
+
+Response:
+{
+  "productId": "uuid",
+  "previousStockQuantity": 148,
+  "newStockQuantity": 143
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10.8 GET /api/categories
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Response:
+[
+  {
+    "id": "uuid",
+    "name": "Audio",
+    "slug": "audio",
+    "description": "Audio devices"
+  }
+]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+11. CUSTOMERS CONTRACTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+11.1 GET /api/customers
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Paginated list.
+
+Response:
+{
+  "items": [
+    {
+      "id": "uuid",
+      "name": "Arjun Sharma",
+      "email": "arjun@example.com",
+      "phone": "9876543210",
+      "city": "Indore",
+      "state": "Madhya Pradesh",
+      "pincode": "452010",
+      "country": "India",
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ],
+  "page": 1,
+  "size": 20,
+  "total": 5,
+  "totalPages": 1
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+11.2 GET /api/customers/{id}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Detailed customer + recent orders.
+
+Response:
+{
+  "id": "uuid",
+  "name": "Arjun Sharma",
+  "email": "arjun@example.com",
+  "phone": "9876543210",
+  "addressLine1": "...",
+  "addressLine2": null,
+  "city": "Indore",
+  "state": "Madhya Pradesh",
+  "pincode": "452010",
+  "country": "India",
+  "recentOrders": [
+    {
+      "id": "uuid",
+      "status": "OrderCompleted",
+      "totalAmount": 2598.00,
+      "createdAt": "..."
+    }
+  ],
+  "createdAt": "...",
+  "updatedAt": "..."
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+11.3 POST /api/customers
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Request:
+{
+  "name": "Neha Patel",
+  "email": "neha@example.com",
+  "phone": "9999999999",
+  "addressLine1": "123 Main Road",
+  "addressLine2": "Near Metro",
+  "city": "Ahmedabad",
+  "state": "Gujarat",
+  "pincode": "380001",
+  "country": "India"
+}
+
+Response 201:
+created customer
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+11.4 PUT /api/customers/{id}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Full update with same schema.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+12. ANALYTICS CONTRACTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All analytics derived from real DB state, never mocked.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+12.1 GET /api/analytics/summary
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Response:
+{
+  "totalOrders": 152,
+  "completedOrders": 141,
+  "cancelledOrders": 11,
+  "activeSagas": 2,
+  "outboxPending": 0,
+  "deadLetterCount": 0,
+  "ordersPerMinute": 2.4,
+  "sagaSuccessRate": 0.9276,
+  "p95LatencyMs": 342,
+  "totalRevenue": 245980.00
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+12.2 GET /api/analytics/orders-over-time?days=30
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Response:
+[
+  {
+    "date": "2026-05-01",
+    "orderCount": 14,
+    "revenue": 28760.00
+  }
+]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+12.3 GET /api/analytics/saga-success-rate?days=7
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Response:
+[
+  {
+    "date": "2026-05-01",
+    "successRate": 0.92,
+    "completedCount": 12,
+    "cancelledCount": 1
+  }
+]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+12.4 GET /api/analytics/top-products?limit=10
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Response:
+[
+  {
+    "productId": "uuid",
+    "productName": "boAt Rockerz 450 Bluetooth Headphone",
+    "quantitySold": 42,
+    "revenue": 54558.00
+  }
+]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+13. STREAM AND HEALTH CONTRACTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+13.1 GET /api/stream
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Type:
+text/event-stream
+
+Auth:
+X-Api-Key required
+
+Frequency:
+- emit one event per second
+- may emit immediately on connect before first interval
+
+Event name:
+- default message event is fine
+- optional typed events can be added later
+
+Payload shape:
+{
+  "activeSagas": 3,
+  "deadLetterCount": 0,
+  "outboxPending": 1,
+  "ordersPerMinute": 2.4,
+  "sagaSuccessRate": 0.96,
+  "p95LatencyMs": 342,
+  "cpuPercent": 18.4,
+  "memoryPercent": 42.1,
+  "circuitStates": {
+    "inventory": "Closed",
+    "payment": "Closed",
+    "shipping": "Closed",
+    "notification": "Closed"
+  },
+  "activeOrder": {
+    "orderId": "uuid",
+    "correlationId": "uuid",
+    "currentState": "PaymentProcessing"
+  },
+  "recentLogs": [
+    {
+      "timestamp": "2026-05-03T11:00:01Z",
+      "level": "Information",
+      "service": "Inventory",
+      "message": "Stock reserved successfully",
+      "correlationId": "uuid"
+    }
+  ],
+  "timestamp": "2026-05-03T11:00:02Z"
+}
+
+Source of each field:
+- activeSagas => saga_states count non-terminal
+- deadLetterCount => RabbitMQ management API or tracked dead-letter queue count
+- outboxPending => outbox_messages where published_at is null
+- ordersPerMinute => count orders created within trailing 60s
+- sagaSuccessRate => completed / (completed + cancelled) over trailing window or all-time; choose and document consistently, recommend trailing 24h
+- p95LatencyMs => percentile derived from completed saga durations
+- cpuPercent => process-level/system metric
+- memoryPercent => process-level/system metric
+- circuitStates => CircuitBreakerStateMonitor
+- activeOrder => latest non-terminal order
+- recentLogs => in-memory rolling buffer or stream snapshot from Serilog sink adapter
+
+No fake values.
+No front-end interpolation.
+No simulated logs.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+13.2 GET /health/live
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Liveness only.
+
+Response:
+{
+  "status": "Healthy"
+}
+
+Must not depend on external dependencies.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+13.3 GET /health/ready
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Readiness.
+
+Checks:
+- DB reachable
+- RabbitMQ reachable
+- Redis reachable
+
+Response:
+{
+  "status": "Ready",
+  "checks": {
+    "database": "up",
+    "rabbitmq": "up",
+    "redis": "up"
+  }
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+13.4 GET /metrics
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Purpose:
+Prometheus exposition.
+
+Counters/gauges/histograms required:
+- orders_submitted_total
+- orders_completed_total
+- orders_cancelled_total
+- saga_duration_ms histogram
+- outbox_pending_gauge
+- active_sagas_gauge
+- dead_letter_count_gauge
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+14. MESSAGE CONTRACTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All contracts immutable.
+
+Required contracts:
+- OrderCreated
+- InventoryReserveRequested
+- InventoryReserved
+- InventoryFailed
+- PaymentProcessRequested
+- PaymentProcessed
+- PaymentFailed
+- ShippingDispatchRequested
+- ShippingDispatched
+- NotificationSendRequested
+- NotificationSent
+- OrderCancelled
+
+Minimum common fields in every contract:
+- messageId string or guid
+- correlationId uuid
+- orderId uuid
+- occurredAt utc timestamp
+
+Contract-specific payloads:
+
+OrderCreated:
+- customerId
+- paymentMethod
+- items [{ productId, sku, quantity, unitPrice }]
+- shippingAddress
+- forceFailure optional payment|inventory|null
+
+InventoryReserveRequested:
+- items
+
+InventoryReserved:
+- reservedItems [{ productId, quantity }]
+
+InventoryFailed:
+- reason
+- failedItems [{ productId, requestedQuantity, availableQuantity }]
+
+PaymentProcessRequested:
+- totalAmount
+- paymentMethod
+
+PaymentProcessed:
+- paymentReference
+
+PaymentFailed:
+- reason
+
+ShippingDispatchRequested:
+- shippingAddress
+- itemCount
+
+ShippingDispatched:
+- shipmentReference
+
+NotificationSendRequested:
+- channel
+- customerEmail optional
+
+NotificationSent:
+- notificationReference optional
+
+OrderCancelled:
+- reason
+- compensationApplied boolean
+
+Exchange/routing convention:
+- exchange: order.events
+- routing keys:
+  - order.created
+  - inventory.reserve.requested
+  - inventory.reserved
+  - inventory.failed
+  - payment.process.requested
+  - payment.processed
+  - payment.failed
+  - shipping.dispatch.requested
+  - shipping.dispatched
+  - notification.send.requested
+  - notification.sent
+  - order.cancelled
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+15. SAGA FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Final state machine behavior:
+
+Happy path:
+1. POST /api/orders
+2. Create order + items + saga_state + event_log + outbox row in one transaction
+3. Outbox publishes OrderCreated
+4. Worker consumes OrderCreated
+5. Inventory step checks stock and reserves inventory
+6. Inventory success writes saga_state update + event_log + outbox PaymentProcessRequested
+7. Payment step succeeds
+8. Payment success writes state + event_log + outbox ShippingDispatchRequested
+9. Shipping step succeeds
+10. Shipping success writes state + event_log + outbox NotificationSendRequested
+11. Notification succeeds
+12. Final state marked OrderCompleted
+13. duration_ms computed from started_at to completed_at
+
+Inventory failure path:
+1. OrderCreated consumed with forceFailure=inventory or insufficient stock
+2. Inventory reservation fails
+3. saga_state current_state = InventoryFailed then OrderCancelled or directly OrderCancelled, choose explicit two-step preferred for trace clarity
+4. orders.status = OrderCancelled
+5. failure_reason = inventory reason
+6. no stock restoration needed if reservation never succeeded
+7. append event log entries for failure and terminal cancellation
+
+Payment failure path:
+1. Inventory reservation succeeds
+2. Payment step fails due to forceFailure=payment or simulated rejection
+3. saga_state current_state = PaymentFailed
+4. compensation step restores stock
+5. orders.status = OrderCancelled
+6. failure_reason = payment reason
+7. append event logs for PaymentFailed, InventoryReleased, OrderCancelled
+
+Strong recommendation:
+- Maintain explicit event log entries even when some states are not persisted in orders table
+- Keep order.status aligned with externally visible major state
+- Keep saga_state richer than order.status
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+16. INVENTORY CONSISTENCY RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Inventory handling requirements:
+- Reservation must be atomic enough to prevent double decrement
+- Use distributed lock per product or per order depending implementation
+- Preferred lock key:
+  inventory:product:{productId}
+- For multi-item order:
+  - acquire locks in deterministic sorted productId order
+  - fail fast if unable to acquire any lock
+  - release all locks in finally block
+- Within DB transaction:
+  - verify stock_quantity >= requested
+  - decrement stock_quantity
+- On payment failure compensation:
+  - increment stock_quantity by reserved amount
+
+Do not:
+- reserve stock in memory only
+- assume single worker instance
+- decrement stock without lock + transaction
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+17. CIRCUIT BREAKER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Apply circuit breaker to simulated external call layer:
+- PaymentService
+- optionally ShippingService/NotificationService, but Payment is mandatory
+
+Config:
+- break after 3 consecutive failures
+- duration 30 seconds
+- half-open allow 1 probe or small probe count
+- state transitions captured in CircuitBreakerStateMonitor
+
+Monitor responsibilities:
+- maintain current state per service
+- expose current states to SSE snapshot layer
+- update on onBreak, onReset, onHalfOpen callbacks
+
+UI must reflect:
+- Closed => normal
+- Open => red + OPEN badge + bolt icon
+- HalfOpen => amber + HALF-OPEN badge
+
+If payment circuit is open:
+- treat payment attempt as failed immediately
+- proceed to compensation path
+- write meaningful failure reason: "Payment circuit open"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+18. OBSERVABILITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Logging:
+- structured JSON
+- include:
+  - timestamp
+  - level
+  - message
+  - service
+  - correlationId
+  - orderId
+  - eventType where applicable
+- keep rolling recent logs for dashboard terminal
+
+Tracing:
+- OpenTelemetry instrumentation
+- local Jaeger only
+- spans around:
+  - API order creation
+  - outbox publish batch
+  - each consumer step
+  - DB save operations optional
+- trace identifiers do not need frontend surfacing in v2 UI, but may be in logs
+
+Metrics:
+- expose /metrics
+- MetricsSnapshotService computes dashboard-friendly aggregates every second or every few seconds
+- SSE endpoint should not run heavy DB calculations independently for every client request if avoidable
+- preferred: MetricsSnapshotService updates in-memory snapshot store; StreamController reads current snapshot
+
+Recommended pattern:
+- StreamSnapshotStore singleton holds latest computed payload
+- MetricsSnapshotService updates it on schedule
+- SSE emits store snapshot
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+19. BACKEND FILE RESPONSIBILITIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Program.cs
+- application composition root
+- add controllers
+- add db context
+- add MassTransit
+- add auth middleware
+- add health checks
+- add metrics
+- add hosted services
+- add redis
+- add policy registry
+- add serilog
+- add OpenTelemetry
+- map controllers
+- map health
+- map metrics
+
+ApiKeyMiddleware.cs
+- validate X-Api-Key
+- hash and lookup in DB
+- reject unauthorized
+- update last_used
+
+CorrelationMiddleware.cs
+- ensure correlation id available for logs and request scope
+- respect existing request header if provided optionally
+- generate otherwise
+
+ExceptionHandlingMiddleware.cs
+- catch unhandled exceptions
+- return normalized problem/error payload
+- log exception with correlation context
+
+OrdersController.cs
+- POST create order
+- GET list
+- GET detail
+- GET saga
+- GET trace
+- POST cancel
+- POST demo
+
+ProductsController.cs
+- GET list/detail/stock/categories
+- POST create
+- PUT update
+- PATCH stock
+- DELETE soft delete
+
+CustomersController.cs
+- GET list/detail
+- POST create
+- PUT update
+
+AnalyticsController.cs
+- summary
+- orders over time
+- success rate
+- top products
+
+StreamController.cs
+- text/event-stream endpoint
+- write one event per second
+- use latest snapshot store
+- detect disconnect and stop
+
+HealthController.cs
+- optional if not using minimal mapped endpoints
+
+AppDbContext.cs
+- entity sets
+- fluent config apply
+- audit timestamps if needed
+
+Entity configuration files
+- table names
+- max lengths
+- indexes
+- constraints
+- relationships
+
+DatabaseSeeder.cs
+- ensure seed data idempotent
+- seed categories
+- seed products
+- seed customers
+- seed api key
+
+Contracts files
+- one file per contract or grouped by domain
+- keep immutable records
+
+Consumers
+- each consumer:
+  - idempotency check
+  - load relevant state
+  - perform domain action
+  - write saga_state + event_log + outbox rows
+  - save transactionally
+  - mark inbox
+- no consumer should directly update frontend state
+
+OutboxPublisherService.cs
+- poll unpublished rows
+- publish to MassTransit/RabbitMQ
+- mark published_at
+- increment retry_count on failure
+- set last_error
+- batch size configurable
+- loop interval configurable
+
+MetricsSnapshotService.cs
+- compute active saga counts
+- compute trailing throughput
+- compute success rate
+- compute p95
+- read circuit states
+- read outbox pending
+- optionally read dead-letter queue count
+- update in-memory snapshot
+- optionally persist metrics_snapshots row
+
+RedisService.cs
+- generic redis wrapper if needed
+- keep minimal, avoid over-abstraction
+
+LockService.cs
+- distributed lock acquisition/release
+- used by InventoryService
+
+InventoryService.cs
+- reserve inventory
+- restore inventory
+- low-level stock operations
+- not a controller-facing service
+
+PaymentService.cs
+- simulated external payment processor
+- may fail based on forced failure header/context
+- returns payment reference on success
+
+ShippingService.cs
+- simulated dispatch creation
+- returns shipment reference
+
+NotificationService.cs
+- simulated notification send
+- returns notification reference or logs send event
+
+AnalyticsService.cs
+- SQL/query logic for summary and trends
+
+MetricsRegistry.cs
+- define counters/gauges/histograms centrally
+
+StreamSnapshotStore.cs
+- in-memory current dashboard state
+
+CircuitBreakerStateMonitor.cs
+- in-memory current circuit states
+- callback receiver from Polly
+
+PolicyRegistry.cs
+- create named resilience policies
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+20. APPLICATION LAYER CONTRACTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Commands:
+- CreateOrderCommand
+- CancelOrderCommand
+- CreateProductCommand
+- UpdateProductCommand
+- AdjustStockCommand
+- CreateCustomerCommand
+- UpdateCustomerCommand
+- CreateDemoOrderCommand
+
+Queries:
+- GetOrdersQuery
+- GetOrderByIdQuery
+- GetOrderSagaQuery
+- GetOrderTraceQuery
+- GetProductsQuery
+- GetProductByIdQuery
+- GetCustomersQuery
+- GetCustomerByIdQuery
+- GetAnalyticsSummaryQuery
+- GetOrdersOverTimeQuery
+- GetSagaSuccessRateQuery
+- GetTopProductsQuery
+
+DTOs required:
+- CreateOrderRequest
+- CreateOrderItemRequest
+- ShippingAddressDto
+- OrderListItemDto
+- OrderDetailDto
+- SagaStateDto
+- SagaTraceDto
+- SagaTraceEventDto
+- ProductDto
+- CategoryDto
+- CustomerDto
+- CustomerDetailDto
+- AnalyticsSummaryDto
+- OrdersOverTimePointDto
+- SuccessRatePointDto
+- TopProductDto
+- StreamMetricsDto
+- PagedResultDto<T>
+
+Validators:
+- CreateOrderRequestValidator
+- CreateProductRequestValidator
+- CreateCustomerRequestValidator
+- UpdateProductRequestValidator
+- UpdateCustomerRequestValidator
+- AdjustStockRequestValidator
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+21. FRONTEND STATE MODEL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Redux slices:
+
+metricsSlice
+State:
+- connected boolean
+- activeSagas number
+- deadLetterCount number
+- outboxPending number
+- ordersPerMinute number
+- sagaSuccessRate number
+- p95LatencyMs number
+- cpuPercent number
+- memoryPercent number
+- circuitStates map
+- recentLogs array
+- lastUpdated string|null
+
+ordersSlice
+State:
+- items array
+- activeOrderId string|null
+- activeCorrelationId string|null
+- selectedOrderId string|null
+- trace array
+- loading flags
+
+uiSlice
+State:
+- orderDetailsDrawerOpen boolean
+- lastActionError string|null
+- theme optional
+
+Use TanStack Query for:
+- products list
+- customers list
+- analytics summary/history
+- orders list/detail if preferred
+
+Use Redux for:
+- SSE-fed live metrics
+- active order tracking
+- UI state that needs cross-component sync
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+22. FRONTEND COMPONENT RESPONSIBILITIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dashboard.tsx
+- top-level dashboard page
+- mount useSystemStream
+- render metric cards, service mesh, saga timeline, demo panel, charts, logs
+
+MetricCards.tsx
+- renders 8 KPI cards from metrics slice
+- color thresholds:
+  - deadLetterCount > 0 => red
+  - outboxPending > 0 => amber/red depending size
+  - p95LatencyMs > 500 => amber, >1000 => red
+  - successRate < 0.9 => red
+  - cpu/memory > 80 => red
+
+ServiceMesh.tsx
+- shows nodes Order, Inventory, Payment, Shipping, Notification
+- derives current/highlight state from active order saga projection
+- overlays circuit breaker state on payment node minimum
+- node statuses:
+  - idle
+  - active
+  - done
+  - failed
+
+SagaTimeline.tsx
+- renders chronological event trace for selected/active order
+- uses GET /api/orders/{id}/trace
+- refresh interval 1s or tied to active order changes
+
+DemoOrderPanel.tsx
+- button: Place Test Order
+- button: Force Payment Failure
+- button: Force Inventory Failure
+- each button hits POST /api/orders/demo with optional X-Force-Failure
+- on success set active order id and fetch trace
+- show loading state
+- show toast result
+
+LogTerminal.tsx
+- render recentLogs from metricsSlice
+- monospace
+- colored by level
+- newest last or newest first, choose and keep consistent
+- cap to last 50 lines in UI
+
+OrdersTable.tsx
+- paginated orders list
+- clicking row sets selected order
+- can open drawer with detail
+
+OrderDetailsDrawer.tsx
+- show order detail + current saga + trace summary
+
+ProductsTable.tsx
+- list products, stock, category, price
+
+CustomersTable.tsx
+- list customers
+
+Charts:
+- OrdersOverTimeChart => analytics/orders-over-time
+- RevenueChart => same endpoint revenue series
+- SuccessRateChart => analytics/saga-success-rate
+
+ConnectionBadge.tsx
+- reflects SSE connected/disconnected
+
+useSystemStream.ts
+- use fetchEventSource
+- send X-Api-Key header
+- reconnect on error with sane backoff
+- dispatch metrics updates
+- set connected true/false
+- abort on unmount
+
+Important:
+- native EventSource does not support custom headers; use fetch-event-source
+
+Snippet:
+import { fetchEventSource } from '@microsoft/fetch-event-source'
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+23. SHARED TYPES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+packages/shared-types exports:
+- PaymentMethod
+- OrderStatus
+- CircuitState
+- ShippingAddress
+- CreateOrderRequest
+- OrderItemInput
+- OrderListItem
+- OrderDetail
+- SagaState
+- SagaTrace
+- SagaTraceEvent
+- Product
+- Category
+- Customer
+- CustomerDetail
+- AnalyticsSummary
+- OrdersOverTimePoint
+- SuccessRatePoint
+- TopProduct
+- StreamMetrics
+- PagedResult<T>
+
+Frontend and backend contract names should stay aligned.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+24. ENVIRONMENT MAPPING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Environments:
+- local
+- staging
+- production
+
+local:
+- Docker Compose postgres/rabbitmq/redis/jaeger
+- API runs locally
+- Worker runs locally
+- frontend runs locally
+- connection strings point to localhost containers
+- use direct local postgres connection
+- VITE_API_URL=http://localhost:<api-port>
+
+staging:
+- same cloud providers as production
+- auto deploy from main branch if desired
+- separate Railway services/project or separate env
+- separate Supabase project strongly preferred if available, else separate schema/db naming strategy
+- separate CloudAMQP and Upstash instances if free tiers allow; if not, namespace carefully and accept lower isolation
+
+production:
+- live recruiter-facing deployment
+- manual or tagged promotion preferred
+- stable data
+- no experimental seed resets except controlled redeploy
+
+Recommended env vars for API:
+- ASPNETCORE_ENVIRONMENT
+- DATABASE_URL
+- DATABASE_MIGRATION_URL
+- RABBITMQ_URL
+- REDIS_URL
+- SEED_API_KEY
+- RABBITMQ_MANAGEMENT_URL
+- RABBITMQ_MANAGEMENT_USERNAME
+- RABBITMQ_MANAGEMENT_PASSWORD
+- METRICS_SNAPSHOT_INTERVAL_MS
+- OUTBOX_PUBLISH_INTERVAL_MS
+- OUTBOX_BATCH_SIZE
+
+Recommended env vars for web:
+- VITE_API_URL
+- VITE_API_KEY
+
+Use:
+- app runtime => DATABASE_URL
+- migrations only => DATABASE_MIGRATION_URL
+
+Do not run EF migrations using pooled transaction connection.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+25. LOCAL DEV INFRA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+docker-compose.yml services:
+- postgres:16-alpine
+- rabbitmq:management-alpine
+- redis:7-alpine
+- jaeger all-in-one
+
+Need:
+- ports exposed
+- named volume for postgres
+- stable credentials
+- simple startup
+
+Local verification checklist:
+- DB accepts connections
+- RabbitMQ management UI opens
+- Redis reachable
+- Jaeger reachable
+- API boots and migrates
+- seed inserted
+- web loads
+- SSE connects
+- demo order completes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+26. CI/CD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ci.yml:
+Trigger:
+- pull_request to main
+- optional push to main
+
+Steps:
+1. checkout
+2. setup dotnet 8
+3. setup pnpm/node
+4. restore backend
+5. restore frontend
+6. run frontend build
+7. run backend integration tests
+8. fail pipeline on any failure
+
+deploy.yml:
+Trigger:
+- push to main for staging or production depending chosen flow
+- optional tags v* for production
+
+Minimum deploy tasks:
+- deploy frontend to Vercel
+- deploy API service to Railway
+- deploy Worker service to Railway
+
+Important:
+- run migrations before app start or via separate release step
+- use DATABASE_MIGRATION_URL for migration step
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+27. TEST PLAN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Integration tests only.
+
+Required test classes:
+
+ApiKeyTests
+- missing X-Api-Key returns 401
+- invalid key returns 401
+- valid key returns 200 on protected read endpoint
+
+SeedDataTests
+- categories seeded
+- products seeded
+- 5 customers seeded
+- api key seeded
+
+OrdersApiTests
+- POST /api/orders valid request returns 201
+- GET orders returns created order
+- GET order detail returns items
+- GET saga returns state projection
+- GET trace returns at least initial event
+
+HappyPathSagaTests
+- create order
+- wait until completed
+- verify final order status completed
+- verify saga flags all true
+- verify stock decremented
+- verify outbox rows published
+- verify trace contains expected sequence
+
+PaymentFailureSagaTests
+- create order with X-Force-Failure=payment
+- wait until cancelled
+- verify inventory was first reserved then restored
+- verify failure_reason contains payment context
+- verify trace contains PaymentFailed and OrderCancelled
+
+InventoryFailureSagaTests
+- create order with X-Force-Failure=inventory or insufficient stock setup
+- wait until cancelled
+- verify stock not decremented or restored to original
+- verify trace contains InventoryFailed and OrderCancelled
+
+ProductsApiTests
+- list products returns active products
+- stock patch updates correctly
+- soft delete hides product from active list
+
+CustomersApiTests
+- list customers
+- create customer
+- update customer
+
+AnalyticsTests
+- summary returns required fields
+- placing order changes total orders
+- trend endpoints return arrays
+
+StreamTests
+- /api/stream returns text/event-stream
+- read 3 events
+- parse JSON
+- required fields present
+- timestamp recent
+- X-Api-Key required
+
+Use polling helper:
+- wait up to 30 seconds for saga terminal state
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+28. PERFORMANCE AND DEMO SLOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Target demo SLOs:
+- saga completion p95 under 2s locally/cloud for demo volume
+- no stuck sagas
+- dead letters zero in normal flow
+- outbox pending drains to zero after broker recovery
+- SSE emits every second consistently
+- dashboard load under 3s on production deploy
+
+These are targets, not hard-coded guarantees.
+System should surface actual measured numbers.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+29. IMPLEMENTATION RULES FOR AGENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Always treat backend as source of truth.
+2. Never generate placeholder demo state on frontend.
+3. Prefer explicit DTOs over leaking EF entities.
+4. Keep message contracts immutable.
+5. Every saga transition must write:
+   - state update
+   - event log
+   - outbox message where next step needed
+6. Every consumer must implement idempotency check.
+7. Every externally visible number on dashboard must come from:
+   - DB
+   - Redis
+   - RabbitMQ
+   - process/system metrics
+   - in-memory monitor fed by real backend events
+8. Do not build extra features outside this PRD unless needed to satisfy contracts.
+9. Final product should run locally with one command sequence and deploy cleanly.
+10. Keep architecture interview-defensible:
+   - Saga over 2PC
+   - Transactional Outbox
+   - API key protection
+   - integration tests with containers
+   - explicit compensation
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+30. MINIMUM CODE SNIPPETS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SSE client shape:
+```ts
+fetchEventSource(`${import.meta.env.VITE_API_URL}/api/stream`, {
+  headers: { 'X-Api-Key': import.meta.env.VITE_API_KEY },
+  onmessage(ev) {
+    dispatch(metricsUpdated(JSON.parse(ev.data)))
+  }
+})
+```
+
+API client shape:
+```ts
+const api = axios.create({
+  baseURL: `${import.meta.env.VITE_API_URL}/api`,
+  headers: { 'X-Api-Key': import.meta.env.VITE_API_KEY }
+})
+```
+
+Outbox poll shape:
+```csharp
+var pending = await db.OutboxMessages
+  .Where(x => x.PublishedAt == null)
+  .OrderBy(x => x.CreatedAt)
+  .Take(batchSize)
+  .ToListAsync(ct);
+```
+
+API key hash shape:
+```csharp
+using var sha = SHA256.Create();
+var hash = Convert.ToHexString(sha.ComputeHash(Encoding.UTF8.GetBytes(apiKey))).ToLowerInvariant();
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+31. FINAL ACCEPTANCE CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The build is complete only if all are true:
+
+- Fresh monorepo created
+- Web app runs
+- API app runs
+- Worker runs
+- Docker Compose local infra runs
+- DB migrations apply
+- Seed data inserted
+- API key auth works
+- POST /api/orders works
+- POST /api/orders/demo works
+- payment failure path works
+- inventory failure path works
+- trace endpoint works
+- saga projection endpoint works
+- SSE endpoint streams real data
+- dashboard shows live metrics
+- service mesh animates real active order
+- log terminal shows real backend logs
+- analytics endpoints return real data
+- outbox drains correctly
+- idempotency guard exists
+- integration tests pass
+- deployment env model documented
+- no fake metrics remain anywhere in frontend or backend
+
+════════════════════════════════════════════════════════════════════
+END OF PRD-AGENT-V2
+════════════════════════════════════════════════════════════════════

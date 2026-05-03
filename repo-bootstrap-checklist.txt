@@ -1,0 +1,986 @@
+════════════════════════════════════════════════════════════════════
+VYAAPARNEXUS v2 — REPO BOOTSTRAP CHECKLIST
+FOR: GOOGLE ANTIGRAVITY AI AGENT + PUNEET (HUMAN VERIFICATION)
+PURPOSE: COMPLETE THIS ENTIRELY BEFORE WRITING ANY FEATURE CODE
+         A BROKEN BOOTSTRAP CAUSES COMPOUNDING FAILURES IN EVERY
+         PHASE AFTER IT. DO NOT SKIP OR REORDER ITEMS.
+VERSION: 2.0
+DATE: 2026-05-03
+GITHUB: github.com/prajapat23puneet
+════════════════════════════════════════════════════════════════════
+
+INSTRUCTIONS:
+- Work through sections in order: A → B → C → D → E → F → G → H
+- Each item has a verification step. Run it. Do not tick without running it.
+- Items marked [PUNEET] require manual action — the agent cannot do these.
+- Items marked [AGENT] the agent executes.
+- Items marked [BOTH] require agent action + human verification.
+
+════════════════════════════════════════════════════════════════════
+SECTION A — GITHUB REPOSITORY
+════════════════════════════════════════════════════════════════════
+
+A1  [PUNEET] Create repository on GitHub
+    - Owner: prajapat23puneet
+    - Name: vyapaar-nexus
+    - Visibility: Public
+    - Initialize with: NOTHING (no README, no .gitignore, no license)
+    - Reason: Agent will push the full initial commit — a pre-init
+              repo causes merge conflict on first push
+    Verify: github.com/prajapat23puneet/vyapaar-nexus exists and shows
+            "this repository is empty"
+
+A2  [PUNEET] Create GitHub Actions secrets
+    Navigate to: repo → Settings → Secrets and variables → Actions
+    Create these Repository secrets (exact names, no quotes):
+      VERCEL_TOKEN          ← get from vercel.com/account/tokens
+      VERCEL_ORG_ID         ← get from vercel.com/account (Personal Account ID)
+      VERCEL_PROJECT_ID     ← set AFTER Vercel project is linked in Section G
+      RAILWAY_TOKEN         ← get from railway.app → Account Settings → Tokens
+      SUPABASE_DB_URL       ← Supabase direct connection string (for migrations)
+    Leave VERCEL_PROJECT_ID blank for now — fill it in Section G step G4
+    Verify: 4 secrets visible in GitHub Secrets UI (VERCEL_PROJECT_ID added later)
+
+A3  [PUNEET] Configure branch protection on main
+    Navigate to: repo → Settings → Branches → Add rule
+    Branch name pattern: main
+    Enable:
+      [x] Require a pull request before merging
+      [x] Require status checks to pass before merging
+          Status check name (add after first CI run): "test"
+      [x] Do not allow bypassing the above settings
+    Reason: Prevents agent from pushing broken code to main directly,
+            which would trigger Railway auto-deploy and break the live URL
+    Verify: Settings → Branches shows "main" with protection rule
+
+A4  [PUNEET] Clone repository locally
+    git clone https://github.com/prajapat23puneet/vyapaar-nexus.git
+    cd vyapaar-nexus
+    Verify: empty directory, git remote origin set to correct URL
+            git remote -v shows: origin https://github.com/prajapat23puneet/vyapaar-nexus.git
+
+════════════════════════════════════════════════════════════════════
+SECTION B — ROOT WORKSPACE FILES
+════════════════════════════════════════════════════════════════════
+
+B1  [AGENT] Create root .gitignore
+    File: /.gitignore
+    Must include ALL of the following blocks:
+
+    # .NET
+    bin/
+    obj/
+    *.user
+    *.suo
+    .vs/
+    TestResults/
+    *.nupkg
+    *.snupkg
+
+    # Node / pnpm
+    node_modules/
+    dist/
+    .turbo/
+    .next/
+    .vercel/
+    coverage/
+
+    # Environment
+    .env
+    .env.local
+    .env.production
+    .env.development
+    !.env.example
+    !.env.*.example
+
+    # OS
+    .DS_Store
+    Thumbs.db
+    desktop.ini
+
+    # Docker
+    .dockerenv
+
+    # IDE
+    .idea/
+    .vscode/settings.json
+    *.swp
+
+    Verify: git status shows .gitignore as only untracked file
+            cat .gitignore | grep "bin/" returns match
+            cat .gitignore | grep "node_modules/" returns match
+            cat .gitignore | grep ".env" returns match
+
+B2  [AGENT] Create .editorconfig
+    File: /.editorconfig
+
+    root = true
+
+    [*]
+    charset = utf-8
+    end_of_line = lf
+    insert_final_newline = true
+    trim_trailing_whitespace = true
+
+    [*.{ts,tsx,js,jsx,json,yaml,yml,md}]
+    indent_style = space
+    indent_size = 2
+
+    [*.{cs,csproj,sln,props}]
+    indent_style = space
+    indent_size = 4
+
+    [Makefile]
+    indent_style = tab
+
+    Verify: file exists at root, root = true is first line
+
+B3  [AGENT] Create root package.json
+    File: /package.json
+
+    {
+      "name": "vyapaar-nexus",
+      "private": true,
+      "version": "0.0.1",
+      "scripts": {
+        "dev": "turbo run dev",
+        "build": "turbo run build",
+        "test": "turbo run test",
+        "lint": "turbo run lint",
+        "type-check": "turbo run type-check",
+        "clean": "turbo run clean && rimraf node_modules"
+      },
+      "devDependencies": {
+        "turbo": "^2.0.0",
+        "rimraf": "^5.0.0"
+      },
+      "engines": {
+        "node": ">=20.0.0",
+        "pnpm": ">=9.0.0"
+      },
+      "packageManager": "pnpm@9.0.0"
+    }
+
+    Verify: cat package.json is valid JSON (no syntax errors)
+
+B4  [AGENT] Create pnpm-workspace.yaml
+    File: /pnpm-workspace.yaml
+
+    packages:
+      - "apps/*"
+      - "packages/*"
+
+    Verify: cat pnpm-workspace.yaml shows both entries
+
+B5  [AGENT] Create turbo.json
+    File: /turbo.json
+
+    {
+      "$schema": "https://turbo.build/schema.json",
+      "globalDependencies": [".env.local"],
+      "tasks": {
+        "build": {
+          "dependsOn": ["^build"],
+          "outputs": ["dist/**", ".next/**", "build/**"]
+        },
+        "dev": {
+          "cache": false,
+          "persistent": true
+        },
+        "test": {
+          "dependsOn": ["^build"],
+          "outputs": ["coverage/**", "TestResults/**"]
+        },
+        "lint": {
+          "outputs": []
+        },
+        "type-check": {
+          "outputs": []
+        },
+        "clean": {
+          "cache": false
+        }
+      }
+    }
+
+    Verify: turbo.json is valid JSON
+            tasks object has: build, dev, test, lint, type-check, clean
+
+B6  [AGENT] Install root workspace tools
+    Run: pnpm install
+    Verify: node_modules/.pnpm directory exists at root
+            pnpm -v returns version >= 9
+            npx turbo --version returns version >= 2
+
+════════════════════════════════════════════════════════════════════
+SECTION C — DIRECTORY STRUCTURE (EMPTY SCAFFOLDING)
+════════════════════════════════════════════════════════════════════
+
+Create the following directories with .gitkeep files so git tracks them.
+DO NOT create any source files yet — just the skeleton.
+
+C1  [AGENT] Create directory structure:
+
+    mkdir -p apps/web
+    mkdir -p apps/api
+    mkdir -p packages/shared-types
+    mkdir -p infra
+    mkdir -p docs/adr
+    mkdir -p .github/workflows
+
+    Touch .gitkeep in each empty directory except .github/workflows
+    (workflows needs real yml files, not .gitkeep)
+
+    Verify: ls -la shows: apps/, packages/, infra/, docs/, .github/
+
+C2  [AGENT] Create infra/docker-compose.yml
+    Full content:
+
+    version: "3.9"
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        restart: unless-stopped
+        environment:
+          POSTGRES_DB: vyaaparnexus
+          POSTGRES_USER: vyaaparnexus
+          POSTGRES_PASSWORD: devpassword123
+        ports:
+          - "5432:5432"
+        volumes:
+          - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U vyaaparnexus"]
+          interval: 5s
+          timeout: 5s
+          retries: 5
+
+      rabbitmq:
+        image: rabbitmq:3.13-management-alpine
+        restart: unless-stopped
+        environment:
+          RABBITMQ_DEFAULT_USER: vyaaparnexus
+          RABBITMQ_DEFAULT_PASS: devpassword123
+        ports:
+          - "5672:5672"
+          - "15672:15672"
+        healthcheck:
+          test: ["CMD", "rabbitmq-diagnostics", "ping"]
+          interval: 10s
+          timeout: 5s
+          retries: 5
+
+      redis:
+        image: redis:7-alpine
+        restart: unless-stopped
+        ports:
+          - "6379:6379"
+        healthcheck:
+          test: ["CMD", "redis-cli", "ping"]
+          interval: 5s
+          timeout: 3s
+          retries: 5
+
+      jaeger:
+        image: jaegertracing/all-in-one:1.57
+        restart: unless-stopped
+        ports:
+          - "16686:16686"
+          - "4317:4317"
+        environment:
+          COLLECTOR_OTLP_ENABLED: "true"
+
+    volumes:
+      postgres_data:
+
+    Verify: docker compose -f infra/docker-compose.yml config
+            shows no YAML errors
+
+C3  [AGENT] Create infra/.env.example
+    Full content (keys only, no real values):
+
+    # Backend — local docker
+    DATABASE_URL=Host=localhost;Port=5432;Database=vyaaparnexus;Username=vyaaparnexus;Password=devpassword123
+    DATABASE_MIGRATION_URL=Host=localhost;Port=5432;Database=vyaaparnexus;Username=vyaaparnexus;Password=devpassword123
+    RABBITMQ_URL=amqp://vyaaparnexus:devpassword123@localhost:5672
+    REDIS_URL=localhost:6379
+    SEED_API_KEY=vyaaparnexus-demo-key-2026
+    ASPNETCORE_ENVIRONMENT=Development
+    OTEL_EXPORTER_JAEGER_ENDPOINT=http://localhost:14268/api/traces
+
+    # Backend — production (Railway)
+    # DATABASE_URL=<supabase transaction pooler url>
+    # DATABASE_MIGRATION_URL=<supabase direct url>
+    # RABBITMQ_URL=<cloudamqp amqps url>
+    # REDIS_URL=<upstash rediss url with password>
+    # SEED_API_KEY=vyaaparnexus-demo-key-2026
+    # ASPNETCORE_ENVIRONMENT=Production
+
+    # Frontend — local
+    # VITE_API_URL=http://localhost:5000
+    # VITE_API_KEY=vyaaparnexus-demo-key-2026
+
+    # Frontend — production (Vercel)
+    # VITE_API_URL=https://your-api.railway.app
+    # VITE_API_KEY=vyaaparnexus-demo-key-2026
+
+    Verify: .env.example exists and contains all keys above
+            .env.example is NOT in .gitignore (it must be committed)
+
+C4  [AGENT] Create ADR placeholder files:
+    docs/adr/001-saga-over-2pc.md
+    docs/adr/002-transactional-outbox.md
+    docs/adr/003-api-key-auth.md
+
+    Each file contains this template:
+    # ADR-00X: [Title]
+
+    ## Status
+    Accepted
+
+    ## Context
+    [Fill in during build]
+
+    ## Decision
+    [Fill in during build]
+
+    ## Consequences
+    [Fill in during build]
+
+    ## Alternatives Rejected
+    [Fill in during build]
+
+    Verify: ls docs/adr/ shows 3 files
+
+C5  [AGENT] Create placeholder README.md at root:
+    # VyaaparNexus
+
+    > Live distributed e-commerce order orchestrator.
+    > Production-grade Saga pattern, Transactional Outbox, Circuit Breaker.
+
+    **Status:** In active development. Full README coming after v2 launch.
+
+    **Live:** [link pending]
+    **Portfolio:** [puneet.is-a.dev](https://puneet.is-a.dev)
+
+    Verify: file exists, no broken markdown
+
+════════════════════════════════════════════════════════════════════
+SECTION D — .NET SOLUTION STRUCTURE
+════════════════════════════════════════════════════════════════════
+
+D1  [AGENT] Create .NET solution and projects:
+
+    cd apps/api
+    dotnet new sln -n VyaaparNexus
+
+    dotnet new classlib -n VyaaparNexus.Domain \
+      -o src/VyaaparNexus.Domain \
+      --framework net8.0
+
+    dotnet new classlib -n VyaaparNexus.Application \
+      -o src/VyaaparNexus.Application \
+      --framework net8.0
+
+    dotnet new classlib -n VyaaparNexus.Infrastructure \
+      -o src/VyaaparNexus.Infrastructure \
+      --framework net8.0
+
+    dotnet new webapi -n VyaaparNexus.API \
+      -o src/VyaaparNexus.API \
+      --framework net8.0 \
+      --no-openapi false
+
+    dotnet new xunit -n VyaaparNexus.Tests \
+      -o tests/VyaaparNexus.Tests \
+      --framework net8.0
+
+    Add all projects to solution:
+    dotnet sln add src/VyaaparNexus.Domain/VyaaparNexus.Domain.csproj
+    dotnet sln add src/VyaaparNexus.Application/VyaaparNexus.Application.csproj
+    dotnet sln add src/VyaaparNexus.Infrastructure/VyaaparNexus.Infrastructure.csproj
+    dotnet sln add src/VyaaparNexus.API/VyaaparNexus.API.csproj
+    dotnet sln add tests/VyaaparNexus.Tests/VyaaparNexus.Tests.csproj
+
+    Verify: dotnet sln list shows all 5 projects
+            dotnet build succeeds (empty projects)
+
+D2  [AGENT] Add project references (dependency direction):
+    Application references Domain:
+    dotnet add src/VyaaparNexus.Application reference src/VyaaparNexus.Domain
+
+    Infrastructure references Application:
+    dotnet add src/VyaaparNexus.Infrastructure reference src/VyaaparNexus.Application
+
+    API references Application + Infrastructure:
+    dotnet add src/VyaaparNexus.API reference src/VyaaparNexus.Application
+    dotnet add src/VyaaparNexus.API reference src/VyaaparNexus.Infrastructure
+
+    Tests references API + Infrastructure:
+    dotnet add tests/VyaaparNexus.Tests reference src/VyaaparNexus.API
+    dotnet add tests/VyaaparNexus.Tests reference src/VyaaparNexus.Infrastructure
+
+    Verify: dotnet build VyaaparNexus.sln succeeds with 0 errors
+
+D3  [AGENT] Create Directory.Packages.props (centralized NuGet versioning):
+    File: apps/api/Directory.Packages.props
+
+    <Project>
+      <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+      </PropertyGroup>
+      <ItemGroup>
+        <!-- EF Core + DB -->
+        <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.0" />
+        <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.0" />
+        <!-- MassTransit -->
+        <PackageVersion Include="MassTransit" Version="8.2.0" />
+        <PackageVersion Include="MassTransit.RabbitMQ" Version="8.2.0" />
+        <PackageVersion Include="MassTransit.EntityFrameworkCore" Version="8.2.0" />
+        <!-- Redis -->
+        <PackageVersion Include="StackExchange.Redis" Version="2.7.0" />
+        <!-- Logging -->
+        <PackageVersion Include="Serilog.AspNetCore" Version="8.0.0" />
+        <PackageVersion Include="Serilog.Sinks.Console" Version="5.0.0" />
+        <!-- OTel -->
+        <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.8.0" />
+        <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.8.0" />
+        <PackageVersion Include="OpenTelemetry.Exporter.Jaeger" Version="1.5.0" />
+        <!-- Metrics -->
+        <PackageVersion Include="prometheus-net.AspNetCore" Version="8.0.0" />
+        <!-- App -->
+        <PackageVersion Include="MediatR" Version="12.0.0" />
+        <PackageVersion Include="FluentValidation.AspNetCore" Version="11.0.0" />
+        <PackageVersion Include="Polly" Version="8.0.0" />
+        <PackageVersion Include="Polly.Extensions.Http" Version="3.0.0" />
+        <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+        <!-- Testing -->
+        <PackageVersion Include="xunit" Version="2.6.0" />
+        <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.0" />
+        <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.0" />
+        <PackageVersion Include="Testcontainers" Version="3.8.0" />
+        <PackageVersion Include="Testcontainers.PostgreSql" Version="3.8.0" />
+        <PackageVersion Include="Testcontainers.RabbitMq" Version="3.8.0" />
+        <PackageVersion Include="Testcontainers.Redis" Version="3.8.0" />
+      </ItemGroup>
+    </Project>
+
+    Verify: dotnet build succeeds after this file is in place
+            No "version conflict" warnings
+
+D4  [AGENT] Add NuGet packages to each project:
+
+    Domain project (zero external deps):
+    No packages needed.
+
+    Application project:
+    dotnet add src/VyaaparNexus.Application package MediatR
+    dotnet add src/VyaaparNexus.Application package FluentValidation.AspNetCore
+
+    Infrastructure project:
+    dotnet add src/VyaaparNexus.Infrastructure package Microsoft.EntityFrameworkCore
+    dotnet add src/VyaaparNexus.Infrastructure package Npgsql.EntityFrameworkCore.PostgreSQL
+    dotnet add src/VyaaparNexus.Infrastructure package MassTransit
+    dotnet add src/VyaaparNexus.Infrastructure package MassTransit.RabbitMQ
+    dotnet add src/VyaaparNexus.Infrastructure package MassTransit.EntityFrameworkCore
+    dotnet add src/VyaaparNexus.Infrastructure package StackExchange.Redis
+    dotnet add src/VyaaparNexus.Infrastructure package Serilog.AspNetCore
+    dotnet add src/VyaaparNexus.Infrastructure package prometheus-net.AspNetCore
+    dotnet add src/VyaaparNexus.Infrastructure package OpenTelemetry.Extensions.Hosting
+    dotnet add src/VyaaparNexus.Infrastructure package Polly
+
+    API project:
+    dotnet add src/VyaaparNexus.API package Swashbuckle.AspNetCore
+    dotnet add src/VyaaparNexus.API package Serilog.AspNetCore
+    dotnet add src/VyaaparNexus.API package MediatR
+
+    Tests project:
+    dotnet add tests/VyaaparNexus.Tests package xunit
+    dotnet add tests/VyaaparNexus.Tests package xunit.runner.visualstudio
+    dotnet add tests/VyaaparNexus.Tests package Microsoft.AspNetCore.Mvc.Testing
+    dotnet add tests/VyaaparNexus.Tests package Testcontainers
+    dotnet add tests/VyaaparNexus.Tests package Testcontainers.PostgreSql
+    dotnet add tests/VyaaparNexus.Tests package Testcontainers.RabbitMq
+    dotnet add tests/VyaaparNexus.Tests package Testcontainers.Redis
+
+    Verify: dotnet build VyaaparNexus.sln
+            0 errors, NuGet package count matches above
+
+D5  [AGENT] Create minimal Program.cs (not full implementation — that is Phase 2):
+    File: src/VyaaparNexus.API/Program.cs
+
+    var builder = WebApplication.CreateBuilder(args);
+    builder.Services.AddControllers();
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
+    var app = builder.Build();
+    app.UseSwagger();
+    app.UseSwaggerUI();
+    app.MapControllers();
+    app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }));
+    app.Run();
+
+    public partial class Program { }
+    // NOTE: public partial class Program is required for WebApplicationFactory in tests
+
+    Verify: dotnet run --project src/VyaaparNexus.API
+            GET http://localhost:5000/health/live returns {"status":"Healthy"}
+            GET http://localhost:5000/swagger opens Swagger UI
+
+════════════════════════════════════════════════════════════════════
+SECTION E — FRONTEND SCAFFOLD
+════════════════════════════════════════════════════════════════════
+
+E1  [AGENT] Create Vite React TypeScript app:
+    cd apps
+    pnpm create vite web --template react-ts
+    (select: React, TypeScript)
+
+    Verify: apps/web/src/main.tsx exists
+            apps/web/package.json has "react": "^18"
+
+E2  [AGENT] Update apps/web/package.json name field:
+    Set "name": "@vyapaar-nexus/web"
+
+E3  [AGENT] Install all frontend dependencies:
+    cd apps/web
+
+    pnpm add @reduxjs/toolkit react-redux
+    pnpm add @tanstack/react-query
+    pnpm add react-router-dom
+    pnpm add axios
+    pnpm add @microsoft/fetch-event-source
+    pnpm add sonner
+    pnpm add lucide-react
+    pnpm add clsx tailwind-merge
+    pnpm add @tremor/react
+
+    pnpm add -D tailwindcss postcss autoprefixer
+    pnpm add -D @types/node
+
+    Verify: apps/web/node_modules contains all packages above
+            pnpm ls in apps/web shows all packages
+
+E4  [AGENT] Initialize TailwindCSS:
+    cd apps/web
+    npx tailwindcss init -p
+
+    Update tailwind.config.ts content:
+    {
+      content: ["./index.html", "./src/**/*.{ts,tsx}"],
+      theme: { extend: {} },
+      plugins: []
+    }
+
+    Update src/index.css:
+    @tailwind base;
+    @tailwind components;
+    @tailwind utilities;
+
+    Verify: tailwind.config.ts exists
+            src/index.css starts with @tailwind base
+
+E5  [AGENT] Initialize shadcn:
+    cd apps/web
+    npx shadcn@latest init
+
+    When prompted:
+      Style: New York
+      Base color: Zinc
+      CSS variables: Yes
+      TypeScript: Yes
+
+    Verify: components.json exists at apps/web root
+            src/lib/utils.ts exists with cn() function
+            src/components/ui/ directory exists
+
+E6  [AGENT] Install shadcn components used in this project:
+    npx shadcn@latest add button
+    npx shadcn@latest add card
+    npx shadcn@latest add badge
+    npx shadcn@latest add table
+    npx shadcn@latest add sheet
+    npx shadcn@latest add drawer
+    npx shadcn@latest add input
+    npx shadcn@latest add select
+    npx shadcn@latest add separator
+    npx shadcn@latest add skeleton
+    npx shadcn@latest add tooltip
+    npx shadcn@latest add sidebar
+
+    Verify: ls src/components/ui/ shows all the above as .tsx files
+
+E7  [AGENT] Create apps/web/.env.local:
+    VITE_API_URL=http://localhost:5000
+    VITE_API_KEY=vyaaparnexus-demo-key-2026
+
+    Create apps/web/.env.production:
+    VITE_API_URL=https://FILL_IN_AFTER_RAILWAY_DEPLOY
+    VITE_API_KEY=vyaaparnexus-demo-key-2026
+
+    Verify: both files exist
+            NEITHER file is tracked by git
+            (git status should not show them)
+
+E8  [AGENT] Update apps/web/vite.config.ts:
+    import { defineConfig } from 'vite'
+    import react from '@vitejs/plugin-react'
+    import path from 'path'
+
+    export default defineConfig({
+      plugins: [react()],
+      resolve: {
+        alias: {
+          "@": path.resolve(__dirname, "./src"),
+        },
+      },
+      server: {
+        proxy: {
+          '/api': {
+            target: 'http://localhost:5000',
+            changeOrigin: true,
+          },
+          '/health': {
+            target: 'http://localhost:5000',
+            changeOrigin: true,
+          }
+        }
+      }
+    })
+
+    Also update tsconfig.json paths:
+    {
+      "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+          "@/*": ["./src/*"]
+        }
+      }
+    }
+
+    Verify: pnpm --filter web dev starts with no TypeScript errors
+            localhost:5173 loads (white screen is fine at this point)
+
+════════════════════════════════════════════════════════════════════
+SECTION F — SHARED TYPES PACKAGE
+════════════════════════════════════════════════════════════════════
+
+F1  [AGENT] Create packages/shared-types/package.json:
+    {
+      "name": "@vyapaar-nexus/shared-types",
+      "version": "0.0.1",
+      "private": true,
+      "main": "./src/index.ts",
+      "types": "./src/index.ts",
+      "scripts": {
+        "type-check": "tsc --noEmit"
+      },
+      "devDependencies": {
+        "typescript": "^5.0.0"
+      }
+    }
+
+F2  [AGENT] Create packages/shared-types/tsconfig.json:
+    {
+      "compilerOptions": {
+        "target": "ES2020",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "strict": true,
+        "declaration": true,
+        "outDir": "./dist"
+      },
+      "include": ["src/**/*"]
+    }
+
+F3  [AGENT] Create packages/shared-types/src/index.ts:
+    Placeholder only for now:
+    // Types will be populated in Phase 9 (frontend scaffold)
+    export type Placeholder = never;
+
+F4  [AGENT] Add shared-types as dependency in apps/web/package.json:
+    pnpm add @vyapaar-nexus/shared-types --workspace --filter web
+
+    Verify: apps/web/package.json shows "@vyapaar-nexus/shared-types": "workspace:*"
+
+════════════════════════════════════════════════════════════════════
+SECTION G — EXTERNAL SERVICES SETUP
+════════════════════════════════════════════════════════════════════
+
+G1  [PUNEET] Set up Supabase project:
+    - Visit supabase.com → New Project
+    - Name: vyapaar-nexus
+    - Database password: generate strong, save to password manager
+    - Region: Singapore (ap-southeast-1) — closest to India
+    - After creation (2-3 min):
+        Go to: Project Settings → Database → Connection string
+        Copy BOTH:
+          "Transaction pooler" URI → this is DATABASE_URL (for runtime)
+          "Session mode" URI OR "Direct connection" → DATABASE_MIGRATION_URL
+        Both look like:
+          postgresql://postgres.[ref]:[password]@[host]:5432/postgres
+
+    Set in GitHub Secrets:
+    - SUPABASE_DB_URL = the direct/session connection string
+
+    Set locally:
+    Create apps/api/.env.local:
+    DATABASE_URL=<transaction pooler string>
+    DATABASE_MIGRATION_URL=<direct connection string>
+
+    Verify: psql $DATABASE_MIGRATION_URL -c "\dt"
+            Shows empty DB (no tables yet — that happens in Phase 1)
+
+G2  [PUNEET] Set up CloudAMQP:
+    - Visit cloudamqp.com → Create New Instance
+    - Name: vyapaar-nexus
+    - Plan: Little Lemur (free)
+    - Region: Google Compute Engine / asia-south1 (Mumbai)
+    - After creation:
+        Copy the AMQPS URL from instance dashboard
+        Format: amqps://user:pass@host/vhost
+    - Add to apps/api/.env.local:
+      RABBITMQ_URL=<cloudamqp amqps url>
+    Verify: CloudAMQP instance shows "Running" status
+
+G3  [PUNEET] Set up Upstash Redis:
+    - Visit upstash.com → Create Database
+    - Name: vyapaar-nexus
+    - Type: Regional
+    - Region: ap-south-1 (Mumbai)
+    - TLS: enabled
+    - After creation:
+        Copy the REDISS connection string
+        Format: rediss://default:password@host:port
+    - Add to apps/api/.env.local:
+      REDIS_URL=<upstash rediss url>
+    Verify: Upstash console shows database with 0 keys
+
+G4  [PUNEET] Set up Railway project:
+    - Visit railway.app → New Project → Empty Project
+    - Name: vyapaar-nexus
+    - Create service: vyapaar-api (deploy from GitHub repo)
+    - Connect to github.com/prajapat23puneet/vyapaar-nexus
+    - Root directory: apps/api
+    - DO NOT deploy yet — just create the service and link the repo
+    - Get Railway token: Account Settings → Tokens → Create
+    - Add RAILWAY_TOKEN to GitHub Secrets (already done in A2)
+    Verify: Railway project exists with 1 service, not yet deployed
+
+G5  [PUNEET] Set up Vercel project:
+    - Visit vercel.com → New Project → Import from GitHub
+    - Select: prajapat23puneet/vyapaar-nexus
+    - Framework: Vite
+    - Root directory: apps/web
+    - DO NOT deploy yet — just create project
+    - Get Vercel Project ID:
+        vercel.com/prajapat23puneet/vyapaar-nexus → Settings → General
+        Copy "Project ID"
+    - Add to GitHub Secrets: VERCEL_PROJECT_ID = [that value]
+    Verify: Vercel project created, VERCEL_PROJECT_ID secret saved
+
+════════════════════════════════════════════════════════════════════
+SECTION H — CI/CD WORKFLOW FILES
+════════════════════════════════════════════════════════════════════
+
+H1  [AGENT] Create .github/workflows/ci.yml:
+
+    name: CI
+
+    on:
+      pull_request:
+        branches: [main]
+
+    jobs:
+      test:
+        name: test
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+
+          - name: Setup .NET 8
+            uses: actions/setup-dotnet@v4
+            with:
+              dotnet-version: "8.0.x"
+
+          - name: Setup pnpm
+            uses: pnpm/action-setup@v3
+            with:
+              version: 9
+
+          - name: Setup Node.js
+            uses: actions/setup-node@v4
+            with:
+              node-version: "20"
+              cache: "pnpm"
+
+          - name: Install dependencies
+            run: pnpm install --frozen-lockfile
+
+          - name: TypeScript type check
+            run: pnpm --filter web type-check
+
+          - name: Run integration tests
+            run: dotnet test apps/api/tests/VyaaparNexus.Tests \
+              --configuration Release \
+              --logger "trx;LogFileName=test-results.trx"
+
+          - name: Upload test results
+            if: always()
+            uses: actions/upload-artifact@v4
+            with:
+              name: test-results
+              path: "**/TestResults/*.trx"
+
+    Verify: file exists, valid YAML (yamllint .github/workflows/ci.yml)
+
+H2  [AGENT] Create .github/workflows/deploy.yml:
+
+    name: Deploy
+
+    on:
+      push:
+        branches: [main]
+
+    jobs:
+      deploy-frontend:
+        name: Deploy Frontend
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+
+          - name: Setup pnpm
+            uses: pnpm/action-setup@v3
+            with:
+              version: 9
+
+          - name: Setup Node.js
+            uses: actions/setup-node@v4
+            with:
+              node-version: "20"
+              cache: "pnpm"
+
+          - name: Install dependencies
+            run: pnpm install --frozen-lockfile
+
+          - name: Build frontend
+            run: pnpm --filter web build
+            env:
+              VITE_API_URL: ${{ vars.VITE_API_URL }}
+              VITE_API_KEY: ${{ vars.VITE_API_KEY }}
+
+          - name: Deploy to Vercel
+            uses: amondnet/vercel-action@v25
+            with:
+              vercel-token: ${{ secrets.VERCEL_TOKEN }}
+              vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+              vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+              working-directory: apps/web
+              vercel-args: "--prod"
+
+      deploy-backend:
+        name: Deploy Backend
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+
+          - name: Install Railway CLI
+            run: npm install -g @railway/cli
+
+          - name: Deploy to Railway
+            run: railway up --service vyapaar-api --detach
+            env:
+              RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+    Verify: valid YAML, both jobs present
+
+H3  [AGENT] Create .github/workflows/keepalive.yml:
+
+    name: Keep Alive
+
+    on:
+      schedule:
+        - cron: "0 */6 * * *"
+      workflow_dispatch:
+
+    jobs:
+      ping:
+        runs-on: ubuntu-latest
+        steps:
+          - name: Ping API health endpoint
+            run: |
+              curl -f ${{ vars.API_HEALTH_URL }}/health/live \
+                -H "X-Api-Key: ${{ vars.VITE_API_KEY }}" \
+                || echo "Ping failed — check Railway deployment"
+
+    Note: API_HEALTH_URL and VITE_API_KEY need to be in
+          GitHub → Settings → Variables (not Secrets — these aren't sensitive)
+    Set: API_HEALTH_URL = your Railway API URL (add after Phase 12)
+
+    Verify: valid YAML, cron is "0 */6 * * *"
+
+════════════════════════════════════════════════════════════════════
+SECTION I — INITIAL COMMIT
+════════════════════════════════════════════════════════════════════
+
+I1  [BOTH] Run full pre-commit verification:
+
+    CHECKLIST BEFORE FIRST COMMIT:
+    [ ] dotnet build apps/api/VyaaparNexus.sln → 0 errors
+    [ ] pnpm --filter web build → 0 TypeScript errors
+    [ ] docker compose -f infra/docker-compose.yml up -d → all 4 services healthy
+    [ ] GET localhost:5000/health/live → {"status":"Healthy"}
+    [ ] GET localhost:5173 → loads in browser (white screen ok)
+    [ ] git status does NOT show .env.local, .env, .env.production
+    [ ] git status does NOT show node_modules, bin/, obj/
+    [ ] git status DOES show .env.example
+
+I2  [AGENT] Create first commit and push:
+
+    git add .
+    git commit -m "chore: bootstrap monorepo — workspace, .NET solution, Vite frontend, Docker Compose, CI/CD"
+    git push -u origin main
+
+    NOTE: main branch has protection requiring PR review.
+    For this one-time bootstrap commit only, temporarily disable
+    "require PR" rule, push directly, then re-enable.
+
+    [PUNEET] Temporarily disable PR requirement:
+    Settings → Branches → Edit main rule → uncheck PR requirement → Save
+    After push: re-enable it
+
+    Verify: github.com/prajapat23puneet/vyapaar-nexus shows commit
+            All files present in GitHub file browser
+            NO .env files visible in GitHub
+            NO node_modules or bin/obj visible in GitHub
+
+I3  [PUNEET] Re-enable branch protection after push:
+    Settings → Branches → Edit main rule → re-check PR requirement → Save
+    Verify: main branch protection shows PR required
+
+════════════════════════════════════════════════════════════════════
+BOOTSTRAP COMPLETE — HANDOFF TO BUILD ORDER PLAN
+════════════════════════════════════════════════════════════════════
+
+At this point the repository has:
+  [x] Monorepo root with pnpm + Turborepo wired
+  [x] .NET 8 solution with 5 projects, references correct, packages installed
+  [x] Vite + React + TS + Tailwind + shadcn frontend scaffold
+  [x] shared-types package linked to frontend
+  [x] Docker Compose with Postgres + RabbitMQ + Redis + Jaeger
+  [x] .env.example committed, no real secrets in git
+  [x] Directory.Packages.props — all NuGet versions centralized
+  [x] GitHub Actions: ci.yml + deploy.yml + keepalive.yml
+  [x] Branch protection: PR required, status check required
+  [x] External services created: Supabase, CloudAMQP, Upstash, Railway, Vercel
+  [x] GitHub Secrets set: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID,
+                          RAILWAY_TOKEN, SUPABASE_DB_URL
+
+NEXT: Begin Phase 1 of Build Order Plan (prd-build-order-v2.txt)
+      Phase 1 starts with: Domain entities, EF Core, Supabase migrations
+
+════════════════════════════════════════════════════════════════════
+END OF BOOTSTRAP CHECKLIST
+════════════════════════════════════════════════════════════════════
