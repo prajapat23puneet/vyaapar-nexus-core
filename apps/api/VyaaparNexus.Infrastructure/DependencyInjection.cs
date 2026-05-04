@@ -1,8 +1,14 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using StackExchange.Redis;
 using VyaaparNexus.Application.Interfaces;
+using VyaaparNexus.Infrastructure.Caching;
+using VyaaparNexus.Infrastructure.Observability;
 using VyaaparNexus.Infrastructure.Persistence;
+using VyaaparNexus.Infrastructure.Resilience;
+using VyaaparNexus.Infrastructure.Services;
 
 namespace VyaaparNexus.Infrastructure;
 
@@ -10,10 +16,57 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        // ── Database ─────────────────────────────────────────────────────────────
         services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("DATABASE_URL") ?? configuration["DATABASE_URL"]));
+            options.UseNpgsql(
+                configuration.GetConnectionString("DATABASE_URL") ?? configuration["DATABASE_URL"]));
 
-        services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
+        services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
+
+        // ── MassTransit + RabbitMQ ────────────────────────────────────────────────
+        // No consumers registered yet (Phase 5+). Configuration skeleton only.
+        services.AddMassTransit(x =>
+        {
+            x.SetKebabCaseEndpointNameFormatter();
+
+            x.UsingRabbitMq((ctx, cfg) =>
+            {
+                var host     = configuration["RabbitMQ:Host"]     ?? "localhost";
+                var vhost    = configuration["RabbitMQ:VHost"]    ?? "/";
+                var username = configuration["RabbitMQ:Username"] ?? "guest";
+                var password = configuration["RabbitMQ:Password"] ?? "guest";
+
+                cfg.Host(host, vhost, h =>
+                {
+                    h.Username(username);
+                    h.Password(password);
+                });
+
+                // Consumers will be added in Phase 5/6.
+                cfg.ConfigureEndpoints(ctx);
+            });
+        });
+
+        // ── Redis ─────────────────────────────────────────────────────────────────
+        var redisConnectionString = configuration["Redis:ConnectionString"]
+                                    ?? configuration["REDIS_URL"]
+                                    ?? "localhost:6379";
+
+        services.AddSingleton<IConnectionMultiplexer>(sp =>
+            ConnectionMultiplexer.Connect(redisConnectionString));
+
+        services.AddSingleton<RedisService>();
+        services.AddSingleton<LockService>();
+
+        // ── Stub Domain Services ──────────────────────────────────────────────────
+        services.AddScoped<IInventoryService, InventoryService>();
+        services.AddScoped<IPaymentService,   PaymentService>();
+        services.AddScoped<IShippingService,  ShippingService>();
+        services.AddScoped<INotificationService, NotificationService>();
+
+        // ── Resilience (Polly) + Circuit-Breaker Monitor ──────────────────────────
+        // Registers CircuitBreakerStateMonitor (singleton) and IReadOnlyPolicyRegistry<string>
+        services.AddResiliencePolicies();
 
         return services;
     }
