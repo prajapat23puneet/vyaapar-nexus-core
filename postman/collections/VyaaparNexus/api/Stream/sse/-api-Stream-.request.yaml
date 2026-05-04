@@ -1,0 +1,9 @@
+$kind: http-request
+name: /api/Stream/
+url: "{{baseUrl}}/api/Stream/"
+method: GET
+body:
+  type: text
+  content: ""
+examples: .resources/-api-Stream-.resources/examples
+order: 1777907184005

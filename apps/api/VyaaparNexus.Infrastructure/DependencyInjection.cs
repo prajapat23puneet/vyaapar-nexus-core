@@ -68,6 +68,16 @@ public static class DependencyInjection
         // Registers CircuitBreakerStateMonitor (singleton) and IReadOnlyPolicyRegistry<string>
         services.AddResiliencePolicies();
 
+        // ── Phase 5: Observability singletons ─────────────────────────────────────
+        // StreamSnapshotStore is a singleton so the SSE controller and
+        // MetricsSnapshotService both share the same instance, and it also
+        // implements ILogEventSink so Serilog can be wired to it in Program.cs.
+        services.AddSingleton<StreamSnapshotStore>();
+
+        // ── Phase 5: Hosted services ──────────────────────────────────────────────
+        services.AddHostedService<HostedServices.OutboxPublisherService>();
+        services.AddHostedService<HostedServices.MetricsSnapshotService>();
+
         return services;
     }
 }

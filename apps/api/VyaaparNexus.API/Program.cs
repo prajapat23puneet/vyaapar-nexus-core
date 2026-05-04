@@ -10,10 +10,11 @@ using System.IO;
 using VyaaparNexus.API.Middlewares;
 using VyaaparNexus.Application;
 using VyaaparNexus.Infrastructure;
+using VyaaparNexus.Infrastructure.Observability;
 using VyaaparNexus.Infrastructure.Persistence;
 using VyaaparNexus.Infrastructure.Persistence.Seed;
 
-// Configure Serilog
+// Configure Serilog bootstrap logger (before DI is built)
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console(new JsonFormatter())
     .CreateBootstrapLogger();
@@ -28,7 +29,10 @@ try
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
-        .WriteTo.Console(new JsonFormatter()));
+        .WriteTo.Console(new JsonFormatter())
+        // Phase 5: wire the StreamSnapshotStore sink — resolved after DI is built
+        // via WriteTo.Sink() with the singleton resolved from the service provider.
+        .WriteTo.Sink(services.GetRequiredService<StreamSnapshotStore>()));
 
     // Add services to the container.
     builder.Services.AddControllers();
