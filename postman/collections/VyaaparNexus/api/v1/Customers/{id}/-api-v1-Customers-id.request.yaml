@@ -1,0 +1,25 @@
+$kind: http-request
+name: /api/v1/Customers/:id
+url: "{{baseUrl}}/api/v1/Customers/:id"
+method: GET
+pathVariables:
+  - key: id
+    value: f5e78dd7-6ae3-2cf3-4023-cc0340588cb3
+    $type: |-
+      {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "value"
+        ]
+      }
+body:
+  type: text
+  content: ""
+examples: ./.resources/-api-v1-Customers-id.resources/examples
+order: 1000

@@ -1,0 +1,9 @@
+$kind: http-request
+name: /api/v1/Stream/sse
+url: "{{baseUrl}}/api/v1/Stream/sse"
+method: GET
+body:
+  type: text
+  content: ""
+examples: ./.resources/-api-v1-Stream-sse.resources/examples
+order: 1000

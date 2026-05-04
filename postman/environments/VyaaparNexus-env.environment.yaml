@@ -1,0 +1,10 @@
+name: VyaaparNexus-env
+values:
+  - key: baseUrl
+    value: ''
+  - key: api-key
+    value: ''
+  - key: testProductId
+    value: ''
+  - key: testCustomerId
+    value: ''

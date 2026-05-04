@@ -1,0 +1,23 @@
+$kind: http-request
+name: /api/v1/Analytics/top-products
+url: "{{baseUrl}}/api/v1/Analytics/top-products?limit=10"
+method: GET
+queryParams:
+  - key: limit
+    value: "10"
+    $type: |-
+      {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "integer",
+            "format": "int32",
+            "default": 10
+          }
+        }
+      }
+body:
+  type: text
+  content: ""
+examples: ./.resources/-api-v1-Analytics-top-products.resources/examples
+order: 1000

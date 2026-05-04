@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using VyaaparNexus.Domain.Entities;
 
+using VyaaparNexus.Application.Interfaces;
+
 namespace VyaaparNexus.Infrastructure.Persistence;
 
-public class AppDbContext : DbContext
+public class AppDbContext : DbContext, IAppDbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {

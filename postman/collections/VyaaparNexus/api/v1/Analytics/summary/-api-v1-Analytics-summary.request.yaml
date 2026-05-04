@@ -1,0 +1,9 @@
+$kind: http-request
+name: /api/v1/Analytics/summary
+url: "{{baseUrl}}/api/v1/Analytics/summary"
+method: GET
+body:
+  type: text
+  content: ""
+examples: ./.resources/-api-v1-Analytics-summary.resources/examples
+order: 1000

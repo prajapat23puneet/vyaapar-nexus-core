@@ -1,0 +1,90 @@
+$kind: http-request
+name: /api/v1/Products/:id
+url: "{{baseUrl}}/api/v1/Products/:id"
+method: PUT
+headers:
+  Content-Type: application/json
+pathVariables:
+  - key: id
+    value: f5e78dd7-6ae3-2cf3-4023-cc0340588cb3
+    $type: |-
+      {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "value"
+        ]
+      }
+body:
+  type: json
+  content: |-
+    {
+      "categoryId": "a29b3b98-3a8d-e6f1-7c53-7cf87da7194f",
+      "sku": "string",
+      "name": "string",
+      "description": "string",
+      "brand": "string",
+      "unitPrice": 6826.8937252233745,
+      "stockQuantity": 8669,
+      "reorderLevel": 8974,
+      "imageUrl": "string",
+      "weightGrams": 8691,
+      "tags": [
+        "string",
+        "string"
+      ]
+    }
+  $type: |-
+    {
+      "type": "object",
+      "properties": {
+        "categoryId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sku": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "brand": {
+          "type": "string"
+        },
+        "unitPrice": {
+          "type": "number",
+          "format": "double"
+        },
+        "stockQuantity": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "reorderLevel": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "imageUrl": {
+          "type": "string"
+        },
+        "weightGrams": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+examples: ./.resources/-api-v1-Products-id-1.resources/examples
+order: 2000

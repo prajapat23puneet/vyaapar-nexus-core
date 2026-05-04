@@ -1,0 +1,9 @@
+$kind: http-request
+name: /api/Health/ping
+url: "{{baseUrl}}/api/Health/ping"
+method: GET
+body:
+  type: text
+  content: ""
+examples: ./.resources/-api-Health-ping.resources/examples
+order: 1000

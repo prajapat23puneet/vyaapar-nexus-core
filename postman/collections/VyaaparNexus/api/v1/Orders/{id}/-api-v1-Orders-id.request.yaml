@@ -1,0 +1,24 @@
+$kind: http-request
+name: /api/v1/Orders/:id
+url: "{{baseUrl}}/api/v1/Orders/:id"
+method: GET
+pathVariables:
+  - key: id
+    value: string
+    $type: |-
+      {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ]
+      }
+body:
+  type: text
+  content: ""
+examples: ./.resources/-api-v1-Orders-id.resources/examples
+order: 1000

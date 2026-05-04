@@ -1,0 +1,40 @@
+$kind: http-request
+name: /api/v1/Products/:id/stock
+url: "{{baseUrl}}/api/v1/Products/:id/stock"
+method: PATCH
+headers:
+  Content-Type: application/json
+pathVariables:
+  - key: id
+    value: f5e78dd7-6ae3-2cf3-4023-cc0340588cb3
+    $type: |-
+      {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "value"
+        ]
+      }
+body:
+  type: json
+  content: |-
+    {
+      "delta": 8782
+    }
+  $type: |-
+    {
+      "type": "object",
+      "properties": {
+        "delta": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    }
+examples: ./.resources/-api-v1-Products-id-stock-1.resources/examples
+order: 2000

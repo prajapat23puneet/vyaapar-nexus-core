@@ -1,0 +1,32 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/Products"
+  method: POST
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "categoryId": "a29b3b98-3a8d-e6f1-7c53-7cf87da7194f",
+        "sku": "string",
+        "name": "string",
+        "description": "string",
+        "brand": "string",
+        "unitPrice": 6826.8937252233745,
+        "stockQuantity": 8669,
+        "reorderLevel": 8974,
+        "imageUrl": "string",
+        "weightGrams": 8691,
+        "tags": [
+          "string",
+          "string"
+        ]
+      }
+response:
+  statusCode: 200
+  statusText: OK
+  body:
+    type: text
+    content: ""
+order: 1000

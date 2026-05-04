@@ -1,0 +1,36 @@
+$kind: http-request
+name: /api/v1/Customers
+url: "{{baseUrl}}/api/v1/Customers?page=1&size=20"
+method: GET
+queryParams:
+  - key: page
+    value: "1"
+    $type: |-
+      {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "integer",
+            "format": "int32",
+            "default": 1
+          }
+        }
+      }
+  - key: size
+    value: "20"
+    $type: |-
+      {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "integer",
+            "format": "int32",
+            "default": 20
+          }
+        }
+      }
+body:
+  type: text
+  content: ""
+examples: ./.resources/-api-v1-Customers.resources/examples
+order: 1000

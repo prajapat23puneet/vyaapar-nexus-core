@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\VyaaparNexus.Domain\VyaaparNexus.Domain.csproj" />
+    <ProjectReference Include="..\VyaaparNexus.Application\VyaaparNexus.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

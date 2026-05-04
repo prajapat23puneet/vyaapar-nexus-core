@@ -1,0 +1,23 @@
+$kind: http-request
+name: /api/v1/Analytics/orders-over-time
+url: "{{baseUrl}}/api/v1/Analytics/orders-over-time?days=30"
+method: GET
+queryParams:
+  - key: days
+    value: "30"
+    $type: |-
+      {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "integer",
+            "format": "int32",
+            "default": 30
+          }
+        }
+      }
+body:
+  type: text
+  content: ""
+examples: ./.resources/-api-v1-Analytics-orders-over-time.resources/examples
+order: 1000

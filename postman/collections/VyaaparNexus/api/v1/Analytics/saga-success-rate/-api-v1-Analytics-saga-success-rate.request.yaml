@@ -1,0 +1,23 @@
+$kind: http-request
+name: /api/v1/Analytics/saga-success-rate
+url: "{{baseUrl}}/api/v1/Analytics/saga-success-rate?days=7"
+method: GET
+queryParams:
+  - key: days
+    value: "7"
+    $type: |-
+      {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "integer",
+            "format": "int32",
+            "default": 7
+          }
+        }
+      }
+body:
+  type: text
+  content: ""
+examples: ./.resources/-api-v1-Analytics-saga-success-rate.resources/examples
+order: 1000

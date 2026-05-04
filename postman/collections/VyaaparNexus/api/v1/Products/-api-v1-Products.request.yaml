@@ -1,0 +1,66 @@
+$kind: http-request
+name: /api/v1/Products
+url: "{{baseUrl}}/api/v1/Products?page=1&size=20"
+method: GET
+queryParams:
+  - key: page
+    value: "1"
+    $type: |-
+      {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "integer",
+            "format": "int32",
+            "default": 1
+          }
+        }
+      }
+  - key: size
+    value: "20"
+    $type: |-
+      {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "integer",
+            "format": "int32",
+            "default": 20
+          }
+        }
+      }
+  - key: category
+    value: f5e78dd7-6ae3-2cf3-4023-cc0340588cb3
+    disabled: true
+    $type: |-
+      {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+  - key: search
+    value: string
+    disabled: true
+    $type: string
+  - key: includeInactive
+    value: "false"
+    disabled: true
+    $type: |-
+      {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+body:
+  type: text
+  content: ""
+examples: ./.resources/-api-v1-Products.resources/examples
+order: 1000

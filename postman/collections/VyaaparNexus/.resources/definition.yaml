@@ -1,0 +1,9 @@
+$kind: collection
+name: VyaaparNexus
+auth:
+  - id: d0eef368-8d5f-4c9a-bbc6-1e55674db685
+    type: apikey
+    name: API Key
+    credentials:
+      key: X-Api-Key
+      value: "{{api-key}}"

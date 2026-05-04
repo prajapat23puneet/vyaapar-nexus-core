@@ -1,0 +1,20 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/Products?page=1&size=20&category=f5e78dd7-6ae3-2cf3-4023-cc0340588cb3&search=string&includeInactive=false"
+  method: GET
+  queryParams:
+    page: "1"
+    size: "20"
+    category: f5e78dd7-6ae3-2cf3-4023-cc0340588cb3
+    search: string
+    includeInactive: "false"
+  body:
+    type: text
+    content: ""
+response:
+  statusCode: 200
+  statusText: OK
+  body:
+    type: text
+    content: ""
+order: 1000
