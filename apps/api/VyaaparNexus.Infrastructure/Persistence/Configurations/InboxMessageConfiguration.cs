@@ -16,7 +16,7 @@ public class InboxMessageConfiguration : IEntityTypeConfiguration<InboxMessage>
         builder.Property(x => x.CorrelationId).HasColumnName("correlation_id");
         builder.Property(x => x.ProcessedAt).HasColumnName("processed_at").IsRequired().HasDefaultValueSql("NOW()");
         
-        builder.HasIndex(x => x.MessageId).IsUnique();
+        builder.HasIndex(x => new { x.MessageId, x.ConsumerName }).IsUnique();
         builder.HasIndex(x => new { x.ConsumerName, x.ProcessedAt }).IsDescending(false, true);
     }
 }

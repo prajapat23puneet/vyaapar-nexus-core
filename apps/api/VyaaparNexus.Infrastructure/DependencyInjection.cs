@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
 using VyaaparNexus.Application.Interfaces;
 using VyaaparNexus.Infrastructure.Caching;
+using VyaaparNexus.Infrastructure.Messaging.Consumers;
 using VyaaparNexus.Infrastructure.Observability;
 using VyaaparNexus.Infrastructure.Persistence;
 using VyaaparNexus.Infrastructure.Resilience;
@@ -28,6 +29,10 @@ public static class DependencyInjection
         services.AddMassTransit(x =>
         {
             x.SetKebabCaseEndpointNameFormatter();
+            x.AddConsumer<OrderCreatedConsumer>();
+            x.AddConsumer<PaymentProcessRequestedConsumer>();
+            x.AddConsumer<ShippingDispatchRequestedConsumer>();
+            x.AddConsumer<NotificationSendRequestedConsumer>();
 
             x.UsingRabbitMq((ctx, cfg) =>
             {
