@@ -19,7 +19,12 @@ public static class DatabaseSeeder
 
         if (!await context.ApiKeys.AnyAsync())
         {
-            var demoKey = "vyaaparnexus-demo-key-2026";
+            var demoKey = Environment.GetEnvironmentVariable("SEED_API_KEY");
+            if (string.IsNullOrWhiteSpace(demoKey))
+            {
+                demoKey = "vyaaparnexus-demo-key-2026";
+            }
+            
             using var sha256 = SHA256.Create();
             var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(demoKey));
             var hashString = Convert.ToHexString(hashBytes).ToLowerInvariant();

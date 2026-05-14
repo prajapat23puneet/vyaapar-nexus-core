@@ -1,6 +1,6 @@
 using Prometheus;
 
-namespace VyaaparNexus.Infrastructure.Observability;
+namespace VyaaparNexus.Application.Observability;
 
 /// <summary>
 /// Central registry for all Prometheus metrics used in this application.

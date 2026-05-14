@@ -4,6 +4,7 @@ using VyaaparNexus.Application.Commands;
 using VyaaparNexus.Application.DTOs;
 using VyaaparNexus.Application.Queries;
 using VyaaparNexus.Domain.Enums;
+using VyaaparNexus.Application.Observability;
 using VyaaparNexus.Infrastructure.Observability;
 
 namespace VyaaparNexus.API.Controllers;
@@ -22,7 +23,7 @@ public class OrdersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateOrder([FromBody] CreateOrderRequest request)
     {
-        var forceFailure = Request.Headers["X-Force-Failure"].ToString();
+        var forceFailure = Request.Headers.TryGetValue("X-Force-Failure", out var hv) ? hv.ToString() : null;
         var result = await _mediator.Send(new CreateOrderCommand(request, string.IsNullOrWhiteSpace(forceFailure) ? null : forceFailure));
         MetricsRegistry.OrdersSubmittedTotal.Inc(); 
         return StatusCode(StatusCodes.Status201Created, result);
@@ -62,7 +63,7 @@ public class OrdersController : ControllerBase
     [HttpPost("demo")]
     public async Task<IActionResult> CreateDemoOrder()
     {
-        var forceFailure = Request.Headers["X-Force-Failure"].ToString();
+        var forceFailure = Request.Headers.TryGetValue("X-Force-Failure", out var hv) ? hv.ToString() : null;
         var result = await _mediator.Send(new CreateDemoOrderCommand(string.IsNullOrWhiteSpace(forceFailure) ? null : forceFailure));
         MetricsRegistry.OrdersSubmittedTotal.Inc();
         return StatusCode(StatusCodes.Status201Created, result);
@@ -71,9 +72,26 @@ public class OrdersController : ControllerBase
     [HttpGet("demo")]
     public async Task<IActionResult> CreateDemoOrderGet()
     {
-        var forceFailure = Request.Headers["X-Force-Failure"].ToString();
+        var forceFailure = Request.Headers.TryGetValue("X-Force-Failure", out var hv) ? hv.ToString() : null;
         var result = await _mediator.Send(new CreateDemoOrderCommand(string.IsNullOrWhiteSpace(forceFailure) ? null : forceFailure));
         MetricsRegistry.OrdersSubmittedTotal.Inc();
         return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    [HttpPost("{id}/cancel")]
+    public async Task<IActionResult> CancelOrder(Guid id)
+    {
+        try
+        {
+            var success = await _mediator.Send(new CancelOrderCommand(id));
+            if (!success)
+                return NotFound();
+            
+            return Ok(new { message = "Order cancelled successfully" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 }

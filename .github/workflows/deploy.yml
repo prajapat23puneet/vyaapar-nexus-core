@@ -5,9 +5,29 @@ on:
     branches: [ main ]
 
 jobs:
-  deploy:
+  deploy-api:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy
-        run: echo "Deploy skeleton"
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+          
+      - name: Build API
+        run: dotnet build apps/api/VyaaparNexus.slnx --configuration Release
+        
+      # TODO Phase 12: Add Railway deploy step here
+      - name: Deploy API
+        run: echo "Deploy step to be configured in Phase 12"
+
+  deploy-frontend:
+    needs: deploy-api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      # TODO Phase 12: Add Vercel deploy step here
+      - name: Deploy Frontend
+        run: echo "Deploy step to be configured in Phase 12"

@@ -20,7 +20,9 @@ public static class DependencyInjection
         // ── Database ─────────────────────────────────────────────────────────────
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(
-                configuration.GetConnectionString("DATABASE_URL") ?? configuration["DATABASE_URL"]));
+                configuration.GetConnectionString("DefaultConnection") 
+                ?? Environment.GetEnvironmentVariable("DATABASE_URL") 
+                ?? throw new InvalidOperationException("Database connection string not found.")));
 
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
@@ -31,21 +33,17 @@ public static class DependencyInjection
             x.SetKebabCaseEndpointNameFormatter();
             x.AddConsumer<OrderCreatedConsumer>();
             x.AddConsumer<PaymentProcessRequestedConsumer>();
+            x.AddConsumer<InventoryReleaseRequestedConsumer>();
             x.AddConsumer<ShippingDispatchRequestedConsumer>();
             x.AddConsumer<NotificationSendRequestedConsumer>();
 
             x.UsingRabbitMq((ctx, cfg) =>
             {
-                var host     = configuration["RabbitMQ:Host"]     ?? "localhost";
-                var vhost    = configuration["RabbitMQ:VHost"]    ?? "/";
-                var username = configuration["RabbitMQ:Username"] ?? "guest";
-                var password = configuration["RabbitMQ:Password"] ?? "guest";
+                var rabbitUrl = configuration["RabbitMQ:Host"] 
+                    ?? Environment.GetEnvironmentVariable("RABBITMQ_URL")
+                    ?? throw new InvalidOperationException("RabbitMQ connection string not found.");
 
-                cfg.Host(host, vhost, h =>
-                {
-                    h.Username(username);
-                    h.Password(password);
-                });
+                cfg.Host(new Uri(rabbitUrl));
 
                 // Consumers will be added in Phase 5/6.
                 cfg.ConfigureEndpoints(ctx);
@@ -54,13 +52,14 @@ public static class DependencyInjection
 
         // ── Redis ─────────────────────────────────────────────────────────────────
         var redisConnectionString = configuration["Redis:ConnectionString"]
-                                    ?? configuration["REDIS_URL"]
-                                    ?? "localhost:6379";
+            ?? Environment.GetEnvironmentVariable("REDIS_URL")
+            ?? throw new InvalidOperationException("Redis connection string not found.");
 
         services.AddSingleton<IConnectionMultiplexer>(sp =>
             ConnectionMultiplexer.Connect(redisConnectionString));
 
-        services.AddSingleton<RedisService>();
+        services.AddSingleton<IRedisService, RedisService>();
+        services.AddSingleton<RedisService>(); // Keep explicit registration in case classes still inject it directly
         services.AddSingleton<LockService>();
 
         // ── Stub Domain Services ──────────────────────────────────────────────────

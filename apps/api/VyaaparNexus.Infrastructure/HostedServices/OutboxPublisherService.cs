@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using VyaaparNexus.Domain.Entities;
+using VyaaparNexus.Infrastructure.Messaging.Contracts;
 using VyaaparNexus.Infrastructure.Persistence;
 
 namespace VyaaparNexus.Infrastructure.HostedServices;
@@ -33,6 +34,15 @@ public sealed class OutboxPublisherService : BackgroundService
     private readonly ILogger<OutboxPublisherService> _logger;
     private readonly int _intervalMs;
     private readonly int _batchSize;
+
+    private static readonly Dictionary<string, Type> _contractTypes = new()
+    {
+        ["OrderCreated"] = typeof(OrderCreated),
+        ["PaymentProcessRequested"] = typeof(PaymentProcessRequested),
+        ["InventoryReleaseRequested"] = typeof(InventoryReleaseRequested),
+        ["ShippingDispatchRequested"] = typeof(ShippingDispatchRequested),
+        ["NotificationSendRequested"] = typeof(NotificationSendRequested),
+    };
 
     public OutboxPublisherService(
         IServiceScopeFactory scopeFactory,
@@ -82,8 +92,9 @@ public sealed class OutboxPublisherService : BackgroundService
         var             db      = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         // Fetch a batch of unpublished messages ordered by creation time
+        // Only fetch messages with less than 5 retries
         var messages = await db.OutboxMessages
-            .Where(m => m.PublishedAt == null)
+            .Where(m => m.PublishedAt == null && m.RetryCount < 5)
             .OrderBy(m => m.CreatedAt)
             .Take(_batchSize)
             .ToListAsync(ct);
@@ -106,17 +117,19 @@ public sealed class OutboxPublisherService : BackgroundService
     {
         try
         {
-            // Deserialize the stored JSON payload into a plain dictionary and publish
-            // using the send endpoint resolved from the exchange + routing key stored
-            // in the outbox row.  MassTransit routes from the endpoint URI.
-            var endpoint = await _bus.GetSendEndpoint(
-                BuildEndpointUri(msg.Exchange, msg.RoutingKey));
+            if (!_contractTypes.TryGetValue(msg.MessageType, out var contractType))
+            {
+                throw new InvalidOperationException($"Could not resolve contract type: {msg.MessageType}");
+            }
 
-            // Deserialize payload back to a dictionary for generic publishing
-            var payloadObj = JsonSerializer.Deserialize<Dictionary<string, object>>(msg.Payload)
-                             ?? new Dictionary<string, object>();
+            var payloadObj = JsonSerializer.Deserialize(msg.Payload, contractType);
 
-            await endpoint.Send<IDictionary<string, object>>(payloadObj, ctx =>
+            if (payloadObj == null)
+            {
+                throw new InvalidOperationException($"Failed to deserialize payload for {msg.MessageType}");
+            }
+
+            await _bus.Publish(payloadObj, contractType, ctx =>
             {
                 ctx.CorrelationId = msg.CorrelationId;
                 ctx.Headers.Set("message-type",  msg.MessageType);
@@ -137,9 +150,14 @@ public sealed class OutboxPublisherService : BackgroundService
             msg.RetryCount++;
             msg.LastError = ex.Message.Length > 500 ? ex.Message[..500] : ex.Message;
 
-            _logger.LogWarning(ex,
-                "Failed to publish outbox message {Id} (retry #{RetryCount}): {Error}",
-                msg.Id, msg.RetryCount, msg.LastError);
+            if (msg.RetryCount >= 5)
+            {
+                _logger.LogWarning(ex, "Dead letter warning: Outbox message {Id} reached max retries (5) and will not be republished.", msg.Id);
+            }
+            else
+            {
+                _logger.LogWarning(ex, "Failed to publish outbox message {Id} (retry #{RetryCount}): {Error}", msg.Id, msg.RetryCount, msg.LastError);
+            }
         }
     }
 

@@ -22,9 +22,9 @@ public class PaymentService : IPaymentService
         if (string.Equals(forceFailure, "payment", StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogWarning("Stub: Payment forced to fail for order {OrderId}", orderId);
-            throw new Exception("Forced payment failure");
+            throw new InvalidOperationException("Simulated payment failure (forced)");
         }
         
-        return Task.FromResult($"PAY-{Guid.NewGuid().ToString("N").Substring(0, 8)}");
+        return Task.FromResult($"PAY-{orderId:N}-{DateTime.UtcNow:yyyyMMddHHmmss}");
     }
 }

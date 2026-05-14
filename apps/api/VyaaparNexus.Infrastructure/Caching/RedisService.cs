@@ -7,7 +7,9 @@ using StackExchange.Redis;
 
 namespace VyaaparNexus.Infrastructure.Caching;
 
-public class RedisService
+using VyaaparNexus.Application.Interfaces;
+
+public class RedisService : IRedisService
 {
     private readonly IDatabase _db;
     private readonly ILogger<RedisService> _logger;

@@ -8,6 +8,14 @@ public class CircuitBreakerStateMonitor
 {
     private readonly ConcurrentDictionary<string, CircuitState> _states = new();
 
+    public CircuitBreakerStateMonitor()
+    {
+        _states["payment"] = CircuitState.Closed;
+        _states["inventory"] = CircuitState.Closed;
+        _states["shipping"] = CircuitState.Closed;
+        _states["notification"] = CircuitState.Closed;
+    }
+
     public void SetState(string service, CircuitState state)
     {
         _states[service] = state;

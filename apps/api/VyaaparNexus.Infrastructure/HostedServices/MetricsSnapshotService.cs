@@ -12,6 +12,8 @@ using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using VyaaparNexus.Application.DTOs;
 using VyaaparNexus.Domain.Enums;
+using VyaaparNexus.Infrastructure.Caching;
+using VyaaparNexus.Application.Observability;
 using VyaaparNexus.Infrastructure.Observability;
 using VyaaparNexus.Infrastructure.Persistence;
 
@@ -41,26 +43,26 @@ public sealed class MetricsSnapshotService : BackgroundService
     private readonly IServiceScopeFactory          _scopeFactory;
     private readonly StreamSnapshotStore           _store;
     private readonly CircuitBreakerStateMonitor    _circuitMonitor;
-    private readonly IConnectionMultiplexer        _redis;
+    private readonly RedisService                  _redisService;
     private readonly ILogger<MetricsSnapshotService> _logger;
     private readonly int _intervalMs;
 
     // CPU tracking
     private TimeSpan   _lastCpuTime    = TimeSpan.Zero;
-    private DateTime   _lastCpuSample  = DateTime.UtcNow;
+    private DateTimeOffset _lastCpuCheck = DateTimeOffset.UtcNow;
 
     public MetricsSnapshotService(
         IServiceScopeFactory       scopeFactory,
         StreamSnapshotStore        store,
         CircuitBreakerStateMonitor circuitMonitor,
-        IConnectionMultiplexer     redis,
+        RedisService               redisService,
         IConfiguration             configuration,
         ILogger<MetricsSnapshotService> logger)
     {
         _scopeFactory   = scopeFactory;
         _store          = store;
         _circuitMonitor = circuitMonitor;
-        _redis          = redis;
+        _redisService   = redisService;
         _logger         = logger;
         _intervalMs     = configuration.GetValue<int>("METRICS_SNAPSHOT_INTERVAL_MS", 1000);
     }
@@ -210,13 +212,12 @@ public sealed class MetricsSnapshotService : BackgroundService
     {
         try
         {
-            var db  = _redis.GetDatabase();
-            var val = await db.StringGetAsync("dl:count");
-            return val.HasValue && int.TryParse(val, out var n) ? n : 0;
+            var deadLetterRaw = await _redisService.GetAsync<string>("dl:count");
+            return int.TryParse(deadLetterRaw, out var n) ? n : 0;
         }
-        catch
+        catch (Exception ex)
         {
-            // Redis unavailable — return 0, do not crash the snapshot loop
+            _logger.LogWarning(ex, "Failed to read dl:count from Redis");
             return 0;
         }
     }
@@ -225,30 +226,25 @@ public sealed class MetricsSnapshotService : BackgroundService
     {
         try
         {
-            var process   = Process.GetCurrentProcess();
-            var nowCpu    = process.TotalProcessorTime;
-            var nowTime   = DateTime.UtcNow;
+            // Memory
+            var totalMemoryBytes = GC.GetTotalMemory(false);
+            var workingSetBytes = Environment.WorkingSet;
+            double memoryPercent = workingSetBytes > 0 
+                ? Math.Round((double)totalMemoryBytes / workingSetBytes * 100, 2) 
+                : 0;
 
-            double cpu = 0;
-            var elapsed = (nowTime - _lastCpuSample).TotalMilliseconds;
-            if (elapsed > 0 && _lastCpuTime != TimeSpan.Zero)
-            {
-                var cpuUsed   = (nowCpu - _lastCpuTime).TotalMilliseconds;
-                var cpuCount  = Environment.ProcessorCount;
-                cpu = Math.Round(cpuUsed / (elapsed * cpuCount) * 100.0, 1);
-                cpu = Math.Clamp(cpu, 0, 100);
-            }
+            // CPU
+            var currentCpu = Process.GetCurrentProcess().TotalProcessorTime;
+            var elapsed = DateTimeOffset.UtcNow - _lastCpuCheck;
+            double cpuPercent = elapsed.TotalMilliseconds > 0 
+                ? Math.Round(
+                    (currentCpu - _lastCpuTime).TotalMilliseconds 
+                    / (Environment.ProcessorCount * elapsed.TotalMilliseconds) * 100, 2)
+                : 0;
+            _lastCpuTime = currentCpu;
+            _lastCpuCheck = DateTimeOffset.UtcNow;
 
-            _lastCpuTime   = nowCpu;
-            _lastCpuSample = nowTime;
-
-            // Memory: GC allocated bytes as % of working-set ceiling (1 GB proxy)
-            var workingSetBytes = process.WorkingSet64;
-            const long ceiling  = 1L * 1024 * 1024 * 1024; // 1 GB reference ceiling
-            var mem = Math.Round((double)workingSetBytes / ceiling * 100.0, 1);
-            mem = Math.Clamp(mem, 0, 100);
-
-            return (cpu, mem);
+            return (cpuPercent, memoryPercent);
         }
         catch
         {

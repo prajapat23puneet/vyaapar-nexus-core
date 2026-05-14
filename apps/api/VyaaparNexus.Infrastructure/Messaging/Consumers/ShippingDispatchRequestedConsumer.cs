@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text.Json;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
@@ -27,16 +28,20 @@ public class ShippingDispatchRequestedConsumer : IConsumer<ShippingDispatchReque
         var messageId = context.MessageId?.ToString() ?? message.MessageId;
         var now = DateTimeOffset.UtcNow;
 
-        if (await _context.InboxMessages.AnyAsync(i => i.MessageId == messageId && i.ConsumerName == consumerName, context.CancellationToken))
-            return;
+        await using var tx = await _context.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, context.CancellationToken);
 
-        await using var tx = await _context.Database.BeginTransactionAsync(context.CancellationToken);
+        if (await _context.InboxMessages.AnyAsync(i => i.MessageId == messageId && i.ConsumerName == consumerName, context.CancellationToken))
+        {
+            await tx.RollbackAsync(context.CancellationToken);
+            return;
+        }
 
         var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == message.OrderId, context.CancellationToken);
         var saga = await _context.SagaStates.FirstOrDefaultAsync(s => s.OrderId == message.OrderId, context.CancellationToken);
         if (order == null || saga == null)
             return;
 
+        var previousState = saga.CurrentState;
         order.Status = OrderStatus.ShippingDispatching;
         order.UpdatedAt = now;
         saga.CurrentState = OrderStatus.ShippingDispatching.ToString();
@@ -47,7 +52,7 @@ public class ShippingDispatchRequestedConsumer : IConsumer<ShippingDispatchReque
             OrderId = message.OrderId,
             EventType = "ShippingDispatching",
             ServiceName = "Shipping",
-            PreviousState = OrderStatus.PaymentProcessed.ToString(),
+            PreviousState = previousState,
             CurrentState = OrderStatus.ShippingDispatching.ToString(),
             Message = "Shipping dispatch started",
             CreatedAt = now
@@ -55,6 +60,7 @@ public class ShippingDispatchRequestedConsumer : IConsumer<ShippingDispatchReque
 
         var shipmentRef = await _shippingService.DispatchAsync(message.OrderId, message.ShippingAddress, context.CancellationToken);
 
+        var pState2 = saga.CurrentState;
         order.Status = OrderStatus.ShippingDispatched;
         order.UpdatedAt = now;
         saga.CurrentState = OrderStatus.ShippingDispatched.ToString();
@@ -66,7 +72,7 @@ public class ShippingDispatchRequestedConsumer : IConsumer<ShippingDispatchReque
             OrderId = message.OrderId,
             EventType = "ShippingDispatched",
             ServiceName = "Shipping",
-            PreviousState = OrderStatus.ShippingDispatching.ToString(),
+            PreviousState = pState2,
             CurrentState = OrderStatus.ShippingDispatched.ToString(),
             Message = $"Shipping dispatched with reference {shipmentRef}",
             CreatedAt = now

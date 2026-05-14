@@ -1,6 +1,65 @@
 @VyaaparNexus.API_HostAddress = http://localhost:5117
+@apiKey = vyaaparnexus-demo-key-2026
 
-GET {{VyaaparNexus.API_HostAddress}}/weatherforecast/
+### Health Live
+GET {{VyaaparNexus.API_HostAddress}}/health/live
 Accept: application/json
 
-###
+### Health Ready
+GET {{VyaaparNexus.API_HostAddress}}/health/ready
+Accept: application/json
+
+### Metrics
+GET {{VyaaparNexus.API_HostAddress}}/metrics
+Accept: text/plain
+
+### Get Products
+GET {{VyaaparNexus.API_HostAddress}}/api/v1/products
+X-Api-Key: {{apiKey}}
+Accept: application/json
+
+### Get Categories
+GET {{VyaaparNexus.API_HostAddress}}/api/v1/categories
+X-Api-Key: {{apiKey}}
+Accept: application/json
+
+### Get Customers
+GET {{VyaaparNexus.API_HostAddress}}/api/v1/customers
+X-Api-Key: {{apiKey}}
+Accept: application/json
+
+### Get Analytics Summary
+GET {{VyaaparNexus.API_HostAddress}}/api/v1/analytics/summary
+X-Api-Key: {{apiKey}}
+Accept: application/json
+
+### Get SSE Stream
+GET {{VyaaparNexus.API_HostAddress}}/api/stream
+X-Api-Key: {{apiKey}}
+Accept: text/event-stream
+
+### Create Demo Order (Happy Path)
+POST {{VyaaparNexus.API_HostAddress}}/api/v1/orders/demo
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+Accept: application/json
+
+{}
+
+### Create Demo Order (Force Payment Failure)
+POST {{VyaaparNexus.API_HostAddress}}/api/v1/orders/demo
+X-Api-Key: {{apiKey}}
+X-Force-Failure: payment
+Content-Type: application/json
+Accept: application/json
+
+{}
+
+### Create Demo Order (Force Inventory Failure)
+POST {{VyaaparNexus.API_HostAddress}}/api/v1/orders/demo
+X-Api-Key: {{apiKey}}
+X-Force-Failure: inventory
+Content-Type: application/json
+Accept: application/json
+
+{}

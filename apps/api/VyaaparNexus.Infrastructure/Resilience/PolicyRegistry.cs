@@ -13,7 +13,7 @@ public static class PolicyRegistrySetup
     {
         services.AddSingleton<CircuitBreakerStateMonitor>();
 
-        services.AddSingleton<IReadOnlyPolicyRegistry<string>>(sp =>
+        services.AddSingleton<IPolicyRegistry<string>>(sp =>
         {
             var registry = new PolicyRegistry();
             var monitor = sp.GetRequiredService<CircuitBreakerStateMonitor>();
@@ -25,12 +25,12 @@ public static class PolicyRegistrySetup
                     retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt - 1))
                 );
 
-            var paymentCircuitBreaker = Policy
+            var paymentCircuitBreaker = Policy<string>
                 .Handle<Exception>()
                 .CircuitBreakerAsync(
-                    exceptionsAllowedBeforeBreaking: 3,
+                    handledEventsAllowedBeforeBreaking: 3,
                     durationOfBreak: TimeSpan.FromSeconds(30),
-                    onBreak: (ex, breakDelay) => monitor.SetState("payment", CircuitState.Open),
+                    onBreak: (outcome, breakDelay) => monitor.SetState("payment", CircuitState.Open),
                     onReset: () => monitor.SetState("payment", CircuitState.Closed),
                     onHalfOpen: () => monitor.SetState("payment", CircuitState.HalfOpen)
                 );

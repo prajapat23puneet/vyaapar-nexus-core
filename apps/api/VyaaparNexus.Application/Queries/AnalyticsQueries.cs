@@ -23,10 +23,12 @@ public class AnalyticsQueriesHandler :
     IRequestHandler<GetTopProductsQuery, List<TopProductDto>>
 {
     private readonly IAppDbContext _context;
+    private readonly IRedisService _redisService;
 
-    public AnalyticsQueriesHandler(IAppDbContext context)
+    public AnalyticsQueriesHandler(IAppDbContext context, IRedisService redisService)
     {
         _context = context;
+        _redisService = redisService;
     }
 
     public async Task<AnalyticsSummaryDto> Handle(GetAnalyticsSummaryQuery request, CancellationToken cancellationToken)
@@ -47,9 +49,21 @@ public class AnalyticsQueriesHandler :
             .Where(o => o.Status == OrderStatus.OrderCompleted)
             .SumAsync(o => (decimal?)o.TotalAmount, cancellationToken) ?? 0m;
 
-        // Note: deadLetterCount is generally from RabbitMQ or Redis, but the PRD says 
-        // "deadLetterCount from Redis key or placeholder 0". We use 0 as placeholder for now.
+        // Gap E: Read actual deadLetterCount from Redis
         int deadLetterCount = 0;
+        try
+        {
+            var deadLetterRaw = await _redisService.GetRawAsync("dl:count", cancellationToken);
+            if (int.TryParse(deadLetterRaw, out var parsed))
+            {
+                deadLetterCount = parsed;
+            }
+        }
+        catch
+        {
+            // Fallback to 0 on Redis failure to avoid crashing the analytics dashboard
+            deadLetterCount = 0;
+        }
         
         // Orders per minute over trailing 60s
         var lastMinute = DateTimeOffset.UtcNow.AddSeconds(-60);
