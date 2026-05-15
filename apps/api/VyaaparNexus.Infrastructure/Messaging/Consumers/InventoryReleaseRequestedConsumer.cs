@@ -95,7 +95,7 @@ public class InventoryReleaseRequestedConsumer : IConsumer<InventoryReleaseReque
                 CurrentState = OrderStatus.OrderCancelled.ToString(),
                 DurationMs = saga.DurationMs,
                 Message = cancellationReason,
-                CreatedAt = now
+                CreatedAt = now.AddMilliseconds(1)
             });
 
         _context.InboxMessages.Add(new InboxMessage

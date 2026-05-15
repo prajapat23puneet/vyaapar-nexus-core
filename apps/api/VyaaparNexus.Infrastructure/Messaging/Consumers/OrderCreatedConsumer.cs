@@ -194,7 +194,7 @@ public class OrderCreatedConsumer : IConsumer<OrderCreated>
                     PreviousState = previousState,
                     CurrentState = OrderStatus.InventoryFailed.ToString(),
                     Message = failureReason,
-                    CreatedAt = now
+                    CreatedAt = now.AddMilliseconds(1)
                 };
 
                 order.Status = OrderStatus.OrderCancelled;
@@ -216,7 +216,7 @@ public class OrderCreatedConsumer : IConsumer<OrderCreated>
                     CurrentState = OrderStatus.OrderCancelled.ToString(),
                     DurationMs = saga.DurationMs,
                     Message = failureReason,
-                    CreatedAt = now
+                    CreatedAt = now.AddMilliseconds(2)
                 };
 
                 _context.SagaEventLogs.AddRange(event1, event2);

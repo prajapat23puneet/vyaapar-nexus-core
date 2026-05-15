@@ -131,7 +131,7 @@ public class AnalyticsQueriesHandler :
 
     public async Task<List<SagaSuccessRateDto>> Handle(GetSagaSuccessRateQuery request, CancellationToken cancellationToken)
     {
-        var since = DateTimeOffset.UtcNow.Date.AddDays(-request.Days);
+        var since = DateTimeOffset.UtcNow.AddDays(-request.Days);
 
         var orders = await _context.Orders
             .Where(o => o.CreatedAt >= since && 

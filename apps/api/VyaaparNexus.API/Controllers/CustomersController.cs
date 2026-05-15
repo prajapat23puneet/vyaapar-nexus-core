@@ -38,13 +38,16 @@ public class CustomersController : ControllerBase
     public async Task<IActionResult> CreateCustomer([FromBody] CreateCustomerRequest request)
     {
         var id = await _mediator.Send(new CreateCustomerCommand(request));
-        return CreatedAtAction(nameof(GetCustomer), new { id }, null);
+        var customer = await _mediator.Send(new GetCustomerByIdQuery(id));
+        return CreatedAtAction(nameof(GetCustomer), new { id }, customer);
     }
 
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateCustomer(Guid id, [FromBody] UpdateCustomerRequest request)
     {
         await _mediator.Send(new UpdateCustomerCommand(id, request));
-        return NoContent();
+        var customer = await _mediator.Send(new GetCustomerByIdQuery(id));
+        if (customer is null) return NotFound();
+        return Ok(customer);
     }
 }
