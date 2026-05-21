@@ -2,24 +2,81 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  build:
+  backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vyaaparnexus_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      rabbitmq:
+        image: rabbitmq:3.13-management-alpine
+        ports:
+          - 5672:5672
+          - 15672:15672
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
-          
+          dotnet-version: 8.0.x
+
       - name: Restore dependencies
         run: dotnet restore apps/api/VyaaparNexus.slnx
-        
+
       - name: Build
         run: dotnet build apps/api/VyaaparNexus.slnx --no-restore --configuration Release
 
+      - name: Test
+        run: dotnet test apps/api/VyaaparNexus.slnx --no-build --configuration Release --verbosity normal
+        env:
+          DATABASE_URL: "Host=localhost;Port=5432;Database=vyaaparnexus_test;Username=postgres;Password=postgres"
+          RABBITMQ_URL: "amqp://guest:guest@localhost:5672"
+          REDIS_URL: "localhost:6379"
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Type check frontend
+        run: pnpm --filter web exec tsc --noEmit
+
+      - name: Build frontend
+        run: pnpm --filter web build
+        env:
+          VITE_API_URL: http://localhost:5000
+          VITE_API_KEY: vyaaparnexus-demo-key-2026
