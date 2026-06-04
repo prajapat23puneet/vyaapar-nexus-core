@@ -30,7 +30,7 @@ type DeltaType = 'increase' | 'moderateIncrease' | 'unchanged' | 'moderateDecrea
 // ─── Arrow badge with guaranteed white icon contrast ─────────────────────────
 // Tremor's BadgeDelta renders the arrow in the same hue as the badge which
 // makes it invisible in dark mode. This component always uses white text.
-function ArrowBadge({ deltaType }: { deltaType: DeltaType }) {
+function ArrowBadge({ deltaType, size }: { deltaType: DeltaType; size?: string }) {
   const map: Record<DeltaType, { bg: string; arrow: string }> = {
     increase:         { bg: 'bg-emerald-500',  arrow: '↑' },
     moderateIncrease: { bg: 'bg-amber-500',    arrow: '↑' },
