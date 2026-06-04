@@ -1,147 +1,127 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
+/* ─── Shadcn/ui CSS variable tokens (light) ──────────────────────────────── */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
+  /* Custom design tokens */
+  --text: #71717a;
+  --text-h: #09090b;
   --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
+  --border: #e4e4e7;
+  --code-bg: #f4f4f5;
+  /* PRD: Vercel-style neutral zinc — no purple, no blue */
+  --accent: hsl(240 5% 45%);
+  --accent-bg: hsla(240, 5%, 45%, 0.07);
+  --accent-border: hsla(240, 5%, 45%, 0.25);
+  --social-bg: rgba(244, 244, 245, 0.5);
   --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+    rgba(0, 0, 0, 0.08) 0 10px 15px -3px, rgba(0, 0, 0, 0.04) 0 4px 6px -2px;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* shadcn/ui semantic tokens — light (Vercel: black primary, zinc neutrals) */
+  --background: 0 0% 100%;
+  --foreground: 240 10% 3.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 3.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 10% 3.9%;
+  --primary: 240 10% 3.9%;      /* near-black */
+  --primary-foreground: 0 0% 98%;
+  --secondary: 240 4.8% 95.9%;
+  --secondary-foreground: 240 5.9% 10%;
+  --muted: 240 4.8% 95.9%;
+  --muted-foreground: 240 3.8% 46.1%;
+  --accent-shadcn: 240 4.8% 95.9%;
+  --accent-shadcn-foreground: 240 5.9% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 100%;
+  --input: 240 5.9% 90%;
+  --ring: 240 5% 64.9%;         /* zinc focus ring — no blue */
+  --radius: 0.5rem;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
-
+  /* Sidebar tokens — zinc neutrals */
   --sidebar: hsl(0 0% 98%);
-
   --sidebar-foreground: hsl(240 5.3% 26.1%);
-
-  --sidebar-primary: hsl(240 5.9% 10%);
-
+  --sidebar-primary: hsl(240 10% 3.9%);
   --sidebar-primary-foreground: hsl(0 0% 98%);
-
-  --sidebar-accent: hsl(240 4.8% 95.9%);
-
+  --sidebar-accent: hsl(240 4.8% 94%);
   --sidebar-accent-foreground: hsl(240 5.9% 10%);
-
-  --sidebar-border: hsl(220 13% 91%);
-
-  --sidebar-ring: hsl(217.2 91.2% 59.8%)
+  --sidebar-border: hsl(240 5.9% 90%);
+  --sidebar-ring: hsl(240 5% 64.9%);
 }
 
-@custom-variant dark (&:is(.dark *));
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
-
+/* ─── Shadcn/ui CSS variable tokens (dark) ───────────────────────────────── */
 .dark {
-  --sidebar: hsl(240 5.9% 10%);
-  --sidebar-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-primary: hsl(224.3 76.3% 48%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 3.7% 15.9%);
-  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-border: hsl(240 3.7% 15.9%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+  /* Custom design tokens */
+  --text: #a1a1aa;
+  --text-h: #fafafa;
+  --bg: #09090b;
+  --border: #27272a;
+  --code-bg: #18181b;
+  /* PRD: Vercel-style neutral zinc — no purple, no blue */
+  --accent: hsl(240 5% 64.9%);
+  --accent-bg: hsla(240, 5%, 64.9%, 0.09);
+  --accent-border: hsla(240, 5%, 64.9%, 0.25);
+  --social-bg: rgba(39, 39, 42, 0.5);
+  --shadow:
+    rgba(0, 0, 0, 0.5) 0 10px 15px -3px, rgba(0, 0, 0, 0.3) 0 4px 6px -2px;
+
+  /* shadcn/ui semantic tokens — dark (Vercel: white primary, zinc neutrals) */
+  --background: 240 10% 3.9%;   /* zinc-950 */
+  --foreground: 0 0% 98%;
+  --card: 240 5.9% 7%;          /* zinc-900-ish */
+  --card-foreground: 0 0% 98%;
+  --popover: 240 5.9% 7%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 0 0% 98%;          /* white — Vercel primary action */
+  --primary-foreground: 240 10% 3.9%;
+  --secondary: 240 3.7% 15.9%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 240 3.7% 15.9%;
+  --muted-foreground: 240 5% 64.9%;
+  --accent-shadcn: 240 3.7% 15.9%;
+  --accent-shadcn-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 50.6%;
+  --destructive-foreground: 0 0% 100%;
+  --input: 240 3.7% 15.9%;
+  --ring: 240 5% 64.9%;         /* zinc focus ring — no blue */
+
+  /* Sidebar tokens — zinc-dark */
+  --sidebar: hsl(240 5.9% 6%);
+  --sidebar-foreground: hsl(240 5% 64.9%);
+  --sidebar-primary: hsl(0 0% 98%);
+  --sidebar-primary-foreground: hsl(240 10% 3.9%);
+  --sidebar-accent: hsl(240 3.7% 12%);
+  --sidebar-accent-foreground: hsl(0 0% 98%);
+  --sidebar-border: hsl(240 3.7% 12%);
+  --sidebar-ring: hsl(240 5% 64.9%);
 }
 
+/* ─── Tailwind v4 @theme mapping ──────────────────────────────────────────── */
 @theme inline {
+  /* Map hsl-based shadcn vars to Tailwind color utilities */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border-shadcn, var(--border)));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  /* Sidebar tokens */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -150,4 +130,68 @@ code {
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 18px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Lock viewport — no page-level scroll even when zooming ──────────────── */
+html,
+body {
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* ─── Suppress ALL scrollbars globally ───────────────────────────────────── */
+* {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE / Edge legacy */
+}
+*::-webkit-scrollbar {
+  display: none;                /* Chrome / Safari / WebKit */
+}
+
+/* ─── Re-enable scrollbar ONLY for the System Log Stream ─────────────────── */
+#log-terminal-output {
+  scrollbar-width: thin;
+  -ms-overflow-style: auto;
+}
+#log-terminal-output::-webkit-scrollbar {
+  display: block;
+  width: 4px;
+}
+#log-terminal-output::-webkit-scrollbar-track {
+  background: transparent;
+}
+#log-terminal-output::-webkit-scrollbar-thumb {
+  background: #2e303a;
+  border-radius: 9999px;
+}
+#log-terminal-output::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+/* ─── Global: cursor-pointer on all interactive elements ──────────────────── */
+button:not([disabled]),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+button[disabled] {
+  cursor: not-allowed;
 }

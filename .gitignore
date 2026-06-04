@@ -6,3 +6,5 @@ obj
 repomix-output.xml
 .vscode/
 .gitignore
+repomix-out.xml
+.gitignore

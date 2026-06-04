@@ -95,20 +95,20 @@ export function Orders() {
   return (
     <div className="space-y-6 relative">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
+      <div className="flex items-center justify-between border-b border-border pb-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[var(--text-h)] my-1 flex items-center gap-2">
-            <ShoppingCart className="h-8 w-8 text-[var(--accent)]" />
+          <h1 className="text-3xl font-bold tracking-tight text-foreground my-1 flex items-center gap-2">
+            <ShoppingCart className="h-8 w-8 text-muted-foreground" />
             Orders Management
           </h1>
-          <p className="text-sm text-[var(--text)]">
+          <p className="text-sm text-muted-foreground">
             Monitor incoming order requests, process status changes, and track active saga workflows.
           </p>
         </div>
         <button
           onClick={() => refetch()}
           disabled={isLoading || isFetching}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-[var(--border)] bg-[var(--social-bg)] text-[var(--text-h)] hover:bg-[var(--border)] active:scale-95 transition-all duration-200 disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-border bg-muted/50 text-foreground hover:bg-muted active:scale-95 transition-all duration-200 disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           Refresh
@@ -149,12 +149,12 @@ export function Orders() {
           </button>
         </div>
       ) : orders.length === 0 ? (
-        <div className="flex flex-col items-center justify-center p-12 rounded-xl border border-[var(--border)] bg-[var(--social-bg)] text-center max-w-xl mx-auto space-y-4">
-          <div className="p-3 bg-[var(--accent-bg)] rounded-full text-[var(--accent)]">
+        <div className="flex flex-col items-center justify-center p-12 rounded-xl border border-border bg-muted/30 text-center max-w-xl mx-auto space-y-4">
+          <div className="p-3 bg-muted rounded-full text-muted-foreground">
             <ShoppingCart className="h-8 w-8" />
           </div>
-          <h2 className="text-xl font-semibold text-[var(--text-h)]">No orders found</h2>
-          <p className="text-sm text-[var(--text)]">
+          <h2 className="text-xl font-semibold text-foreground">No orders found</h2>
+          <p className="text-sm text-muted-foreground">
             There are no orders submitted yet. Try placing a test order from the Dashboard.
           </p>
         </div>
@@ -261,8 +261,8 @@ export function Orders() {
       >
         <div className="flex items-center justify-between p-6 border-b border-[var(--border)] bg-[var(--social-bg)]/20">
           <div>
-            <h2 className="text-xl font-bold text-[var(--text-h)] flex items-center gap-2">
-              <ListOrdered className="h-5 w-5 text-[var(--accent)]" />
+            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+              <ListOrdered className="h-5 w-5 text-muted-foreground" />
               Saga Audit Details
             </h2>
             <p className="text-xs text-[var(--text)] font-mono mt-1 select-all">{selectedOrderId}</p>
@@ -280,8 +280,8 @@ export function Orders() {
 
         {orderLoading ? (
           <div className="flex-grow flex flex-col items-center justify-center p-8 space-y-4 animate-pulse">
-            <RefreshCw className="h-8 w-8 animate-spin text-[var(--accent)]" />
-            <span className="text-sm text-[var(--text)]">Loading order details & trace...</span>
+            <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Loading order details &amp; trace...</span>
           </div>
         ) : !orderDetails ? (
           <div className="flex-grow flex flex-col items-center justify-center p-8 text-center space-y-3">
@@ -313,8 +313,8 @@ export function Orders() {
             <div className="grid grid-cols-2 gap-6">
               {/* Customer Column */}
               <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-h)] flex items-center gap-1.5 border-b border-[var(--border)] pb-1.5">
-                  <Mail className="h-3.5 w-3.5 text-[var(--accent)]" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5 border-b border-border pb-1.5">
+                  <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                   Customer Profile
                 </h4>
                 <div className="text-sm space-y-1">

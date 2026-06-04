@@ -63,7 +63,7 @@ try
         try
         {
             var context = services.GetRequiredService<AppDbContext>();
-            var basePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "VyaaparNexus.Infrastructure"));
+            var basePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "VyaaparNexus.Infrastructure"));
             if (!Directory.Exists(basePath))
             {
                 // Fallback for docker or other environments
