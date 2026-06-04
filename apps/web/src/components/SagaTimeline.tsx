@@ -122,8 +122,11 @@ function TimelineStep({ event, index, isLast }: { event: SagaTraceEvent; index: 
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export function SagaTimeline() {
-  const activeOrderId = useSelector((s: RootState) => s.orders.activeOrderId)
+export function SagaTimeline({ orderId }: { orderId?: string }) {
+  const activeOrderIdRedux = useSelector((s: RootState) => s.orders.activeOrderId)
+  const isHistorical = !!orderId
+  const activeOrderId = orderId || activeOrderIdRedux
+  
   const [trace, setTrace] = useState<SagaTrace | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Track which orderId the current trace belongs to
@@ -182,7 +185,10 @@ export function SagaTimeline() {
     }
 
     poll()
-    intervalRef.current = setInterval(poll, 1000)
+    // Do not set interval if it is a specific historical order passed via prop
+    if (!isHistorical) {
+      intervalRef.current = setInterval(poll, 1000)
+    }
 
     // Fix 2b — cleanup does NOT call setTrace(null); trace persists until
     // replaced by fresh data for the next order
@@ -192,7 +198,7 @@ export function SagaTimeline() {
         intervalRef.current = null
       }
     }
-  }, [activeOrderId])
+  }, [activeOrderId, isHistorical])
 
   const events = trace?.events ?? []
 
@@ -225,7 +231,7 @@ export function SagaTimeline() {
           <svg className="animate-spin w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v2m0 12v2M4 12H2m20 0h-2M6.34 6.34l-1.42-1.41M19.07 19.07l-1.41-1.42M6.34 17.66l-1.42 1.42M19.07 4.93l-1.41 1.42" />
           </svg>
-          Loading trace for new order…
+          Loading trace for {isHistorical ? 'order' : 'new order'}…
         </div>
       )}
 
