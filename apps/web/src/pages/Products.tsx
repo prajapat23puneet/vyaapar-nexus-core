@@ -18,19 +18,20 @@ export function Products() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
+      <div className="flex items-center justify-between border-b border-border pb-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[var(--text-h)] my-1">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground my-1 flex items-center gap-2">
+            <Package className="h-8 w-8 text-muted-foreground" />
             Products Catalog
           </h1>
-          <p className="text-sm text-[var(--text)]">
+          <p className="text-sm text-muted-foreground">
             Manage inventory, view real-time stock levels, and explore active listings.
           </p>
         </div>
         <button
           onClick={() => refetch()}
           disabled={isLoading || isFetching}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-[var(--border)] bg-[var(--social-bg)] text-[var(--text-h)] hover:bg-[var(--border)] active:scale-95 transition-all duration-200 disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-border bg-muted/50 text-foreground hover:bg-muted active:scale-95 transition-all duration-200 disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           Refresh
@@ -77,12 +78,12 @@ export function Products() {
         </div>
       ) : products.length === 0 ? (
         // Empty State
-        <div className="flex flex-col items-center justify-center p-12 rounded-xl border border-[var(--border)] bg-[var(--social-bg)] text-center max-w-xl mx-auto space-y-4">
-          <div className="p-3 bg-[var(--accent-bg)] rounded-full text-[var(--accent)]">
+        <div className="flex flex-col items-center justify-center p-12 rounded-xl border border-border bg-muted/30 text-center max-w-xl mx-auto space-y-4">
+          <div className="p-3 bg-muted rounded-full text-muted-foreground">
             <Package className="h-8 w-8" />
           </div>
-          <h2 className="text-xl font-semibold text-[var(--text-h)]">No products found</h2>
-          <p className="text-sm text-[var(--text)]">
+          <h2 className="text-xl font-semibold text-foreground">No products found</h2>
+          <p className="text-sm text-muted-foreground">
             The catalog is currently empty. Initialize seed data in the backend database to view listings.
           </p>
         </div>
@@ -109,11 +110,11 @@ export function Products() {
             return (
               <div
                 key={product.id}
-                className="group relative rounded-xl border border-[var(--border)] bg-[var(--bg)] p-6 shadow-sm hover:shadow-md hover:border-[var(--accent)] hover:scale-[1.02] active:scale-[0.99] transition-all duration-300 flex flex-col justify-between h-48"
+                className="group relative rounded-xl border border-border bg-card p-6 shadow-sm hover:shadow-md hover:border-foreground/20 hover:scale-[1.02] active:scale-[0.99] transition-all duration-300 flex flex-col justify-between h-48"
               >
                 <div>
                   <div className="flex items-start justify-between gap-4">
-                    <h3 className="font-bold text-lg text-[var(--text-h)] group-hover:text-[var(--accent)] transition-colors line-clamp-1">
+                    <h3 className="font-bold text-lg text-foreground group-hover:text-foreground transition-colors line-clamp-1">
                       {product.name}
                     </h3>
                     <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--social-bg)] text-[var(--text)] border border-[var(--border)]">

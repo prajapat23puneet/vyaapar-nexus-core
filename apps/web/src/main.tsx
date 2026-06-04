@@ -7,6 +7,11 @@ import App from './App.tsx';
 import { store } from './store';
 import './index.css';
 
+// FIX-6: Apply dark class to <html> — PRD mandates "dark theme first".
+// uiSlice initialState has theme: 'dark'. The .dark CSS class in index.css
+// activates all dark-mode custom properties and shadcn sidebar dark tokens.
+document.documentElement.classList.add('dark');
+
 const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

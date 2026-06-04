@@ -18,20 +18,20 @@ export function Customers() {
   return (
     <div className="space-y-6">
       {/* Header Panel */}
-      <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
+      <div className="flex items-center justify-between border-b border-border pb-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[var(--text-h)] my-1 flex items-center gap-2">
-            <Users className="h-8 w-8 text-[var(--accent)]" />
+          <h1 className="text-3xl font-bold tracking-tight text-foreground my-1 flex items-center gap-2">
+            <Users className="h-8 w-8 text-muted-foreground" />
             Customers Registry
           </h1>
-          <p className="text-sm text-[var(--text)]">
+          <p className="text-sm text-muted-foreground">
             View registered user profiles, contact details, and locations.
           </p>
         </div>
         <button
           onClick={() => refetch()}
           disabled={isLoading || isFetching}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-[var(--border)] bg-[var(--social-bg)] text-[var(--text-h)] hover:bg-[var(--border)] active:scale-95 transition-all duration-200 disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-border bg-muted/50 text-foreground hover:bg-muted active:scale-95 transition-all duration-200 disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           Refresh
@@ -73,12 +73,12 @@ export function Customers() {
         </div>
       ) : customers.length === 0 ? (
         // Empty State
-        <div className="flex flex-col items-center justify-center p-12 rounded-xl border border-[var(--border)] bg-[var(--social-bg)] text-center max-w-xl mx-auto space-y-4">
-          <div className="p-3 bg-[var(--accent-bg)] rounded-full text-[var(--accent)]">
+        <div className="flex flex-col items-center justify-center p-12 rounded-xl border border-border bg-muted/30 text-center max-w-xl mx-auto space-y-4">
+          <div className="p-3 bg-muted rounded-full text-muted-foreground">
             <Users className="h-8 w-8" />
           </div>
-          <h2 className="text-xl font-semibold text-[var(--text-h)]">No customers found</h2>
-          <p className="text-sm text-[var(--text)]">
+          <h2 className="text-xl font-semibold text-foreground">No customers found</h2>
+          <p className="text-sm text-muted-foreground">
             There are no customer records in the database.
           </p>
         </div>
@@ -114,7 +114,7 @@ export function Customers() {
                       </td>
                       <td className="p-4 space-y-1">
                         <div className="flex items-center gap-2 text-xs">
-                          <Mail className="h-3 w-3 shrink-0 text-[var(--accent)]" />
+                          <Mail className="h-3 w-3 shrink-0 text-muted-foreground" />
                           <span>{customer.email}</span>
                         </div>
                         {customer.phone && (
