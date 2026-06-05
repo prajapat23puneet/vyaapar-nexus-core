@@ -15,8 +15,8 @@ public class OrdersApiTests : IntegrationTestBase
 
     private async Task<CreateOrderRequest> BuildValidCreateOrderRequest()
     {
-        var customer = await Db.Customers.FirstAsync();
-        var product = await Db.Products.FirstAsync(x => x.IsActive);
+        var customer = await GetDb().Customers.FirstAsync();
+        var product = await GetDb().Products.FirstAsync(x => x.IsActive);
 
         return new CreateOrderRequest
         {
@@ -111,3 +111,4 @@ public class OrdersApiTests : IntegrationTestBase
         trace.Events.First().EventType.Should().Be("OrderSubmitted");
     }
 }
+

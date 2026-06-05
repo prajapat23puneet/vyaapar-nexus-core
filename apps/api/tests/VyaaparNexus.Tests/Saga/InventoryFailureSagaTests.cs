@@ -15,7 +15,7 @@ public class InventoryFailureSagaTests : IntegrationTestBase
 
     private async Task<ProductDto> CreateDedicatedProduct(string sku)
     {
-        var category = await Db.Categories.FirstAsync();
+        var category = await GetDb().Categories.FirstAsync();
         var createResp = await Client.PostAsJsonAsync("/api/v1/products", new CreateProductRequest
         {
             CategoryId = category.Id,
@@ -33,7 +33,7 @@ public class InventoryFailureSagaTests : IntegrationTestBase
     public async Task InventoryFailure_SagaReachesOrderCancelled_StockUnchanged()
     {
         var product = await CreateDedicatedProduct($"INV-SAGA-A-{Guid.NewGuid():N}");
-        var customer = await Db.Customers.FirstAsync();
+        var customer = await GetDb().Customers.FirstAsync();
 
         var request = new CreateOrderRequest
         {
@@ -63,8 +63,8 @@ public class InventoryFailureSagaTests : IntegrationTestBase
         var orderDetails = await orderResponse.Content.ReadFromJsonAsync<OrderDetailDto>();
         orderDetails!.FailureReason.Should().NotBeNullOrEmpty();
 
-        Db.ChangeTracker.Clear();
-        var finalProduct = await Db.Products.FirstAsync(x => x.Id == product.Id);
+        GetDb().ChangeTracker.Clear();
+        var finalProduct = await GetDb().Products.FirstAsync(x => x.Id == product.Id);
         finalProduct.StockQuantity.Should().Be(50); // forced failure — no reservation, stock unchanged
     }
 
@@ -72,7 +72,7 @@ public class InventoryFailureSagaTests : IntegrationTestBase
     public async Task InventoryFailure_TraceContainsCorrectEvents()
     {
         var product = await CreateDedicatedProduct($"INV-SAGA-B-{Guid.NewGuid():N}");
-        var customer = await Db.Customers.FirstAsync();
+        var customer = await GetDb().Customers.FirstAsync();
 
         var request = new CreateOrderRequest
         {
@@ -107,3 +107,4 @@ public class InventoryFailureSagaTests : IntegrationTestBase
         eventTypes.Should().NotContain("InventoryReserved");
     }
 }
+

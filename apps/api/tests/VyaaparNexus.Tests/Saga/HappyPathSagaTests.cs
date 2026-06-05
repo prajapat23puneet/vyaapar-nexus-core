@@ -16,7 +16,7 @@ public class HappyPathSagaTests : IntegrationTestBase
     /// <summary>Creates a dedicated product for this test via API so stock is fully controlled and isolated.</summary>
     private async Task<ProductDto> CreateDedicatedProduct(string sku)
     {
-        var category = await Db.Categories.FirstAsync();
+        var category = await GetDb().Categories.FirstAsync();
         var createResp = await Client.PostAsJsonAsync("/api/v1/products", new CreateProductRequest
         {
             CategoryId = category.Id,
@@ -34,7 +34,7 @@ public class HappyPathSagaTests : IntegrationTestBase
     public async Task HappyPath_SagaReachesOrderCompleted()
     {
         var product = await CreateDedicatedProduct($"HP-SAGA-A-{Guid.NewGuid():N}");
-        var customer = await Db.Customers.FirstAsync();
+        var customer = await GetDb().Customers.FirstAsync();
 
         var request = new CreateOrderRequest
         {
@@ -58,11 +58,11 @@ public class HappyPathSagaTests : IntegrationTestBase
         saga.NotificationSent.Should().BeTrue();
         saga.DurationMs.Should().NotBeNull().And.BeGreaterThan(0);
 
-        Db.ChangeTracker.Clear();
-        var finalProduct = await Db.Products.FirstAsync(x => x.Id == product.Id);
+        GetDb().ChangeTracker.Clear();
+        var finalProduct = await GetDb().Products.FirstAsync(x => x.Id == product.Id);
         finalProduct.StockQuantity.Should().Be(49); // started at 50, ordered 1
 
-        var outboxMessages = await Db.OutboxMessages
+        var outboxMessages = await GetDb().OutboxMessages
             .Where(x => x.CorrelationId == saga.CorrelationId)
             .ToListAsync();
 
@@ -74,7 +74,7 @@ public class HappyPathSagaTests : IntegrationTestBase
     public async Task HappyPath_TraceContainsExpectedSequence()
     {
         var product = await CreateDedicatedProduct($"HP-SAGA-B-{Guid.NewGuid():N}");
-        var customer = await Db.Customers.FirstAsync();
+        var customer = await GetDb().Customers.FirstAsync();
 
         var request = new CreateOrderRequest
         {
@@ -111,3 +111,4 @@ public class HappyPathSagaTests : IntegrationTestBase
         eventTypes.Should().Contain("NotificationSent");
     }
 }
+

@@ -13,32 +13,33 @@ public class SeedDataTests : IntegrationTestBase
     [Fact]
     public async Task CategoriesAreSeeded()
     {
-        var count = await Db.Categories.CountAsync();
+        var count = await GetDb().Categories.CountAsync();
         count.Should().BeGreaterThanOrEqualTo(7);
     }
 
     [Fact]
     public async Task ProductsAreSeeded()
     {
-        var count = await Db.Products.CountAsync();
+        var count = await GetDb().Products.CountAsync();
         count.Should().BeGreaterThanOrEqualTo(10);
     }
 
     [Fact]
     public async Task CustomersAreSeeded()
     {
-        var count = await Db.Customers.CountAsync();
+        var count = await GetDb().Customers.CountAsync();
         count.Should().BeGreaterThanOrEqualTo(5);
     }
 
     [Fact]
     public async Task ApiKeyIsSeeded()
     {
-        var hasActiveKey = await Db.ApiKeys.AnyAsync(x => x.IsActive);
+        var hasActiveKey = await GetDb().ApiKeys.AnyAsync(x => x.IsActive);
         hasActiveKey.Should().BeTrue();
 
-        var key = await Db.ApiKeys.FirstOrDefaultAsync(x => x.IsActive);
+        var key = await GetDb().ApiKeys.FirstOrDefaultAsync(x => x.IsActive);
         key.Should().NotBeNull();
         key!.KeyHash.Should().NotBeNullOrEmpty();
     }
 }
+

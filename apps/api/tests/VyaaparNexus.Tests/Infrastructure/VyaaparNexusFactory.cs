@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
@@ -31,26 +33,20 @@ public class VyaaparNexusFactory : WebApplicationFactory<Program>, IAsyncLifetim
         await _rabbit.StartAsync();
         await _redis.StartAsync();
 
-        // Ensure App is built so services are available to run migrations
-        _ = Server;
+        CreateClient();
 
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.Database.MigrateAsync();
         
-        // Use DatabaseSeeder logic here. It's normally a static class in this setup (from Program.cs view)
-        // Wait, from Program.cs: `await DatabaseSeeder.SeedAsync(context, basePath);`
-        // We can just call it here.
         var basePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "VyaaparNexus.Infrastructure"));
-        // Check if we need a valid basePath for seed data. In tests, we might need to point to where seed files are.
-        // The VyaaparNexusFactory runs in tests bin folder.
-        // Let's copy SeedData to tests or point correctly. 
-        // A better approach is to rely on the seeder if it creates data without files or find the correct path.
         if (!Directory.Exists(basePath))
         {
             basePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "VyaaparNexus.Infrastructure"));
         }
         await DatabaseSeeder.SeedAsync(db, basePath);
+
+        await Task.Delay(3000);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -62,11 +58,20 @@ public class VyaaparNexusFactory : WebApplicationFactory<Program>, IAsyncLifetim
                 ["DATABASE_URL"] = _postgres.GetConnectionString(),
                 ["DATABASE_MIGRATION_URL"] = _postgres.GetConnectionString(),
                 ["RABBITMQ_URL"] = _rabbit.GetConnectionString(),
-                ["REDIS_URL"] = _redis.GetConnectionString(),
+                ["Redis:ConnectionString"] = _redis.GetConnectionString(),
                 ["ASPNETCORE_ENVIRONMENT"] = "Testing",
                 ["SEED_API_KEY"] = "vyaaparnexus-demo-key-2026",
                 ["FrontendUrl"] = "http://localhost:5173"
             });
+        });
+
+        builder.ConfigureTestServices(services =>
+        {
+            var descriptors = services.Where(d => d.ServiceType == typeof(IHostedService)).ToList();
+            foreach (var descriptor in descriptors)
+            {
+                services.Remove(descriptor);
+            }
         });
     }
 
@@ -78,3 +83,4 @@ public class VyaaparNexusFactory : WebApplicationFactory<Program>, IAsyncLifetim
         await base.DisposeAsync();
     }
 }
+

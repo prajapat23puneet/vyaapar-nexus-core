@@ -8,16 +8,20 @@ namespace VyaaparNexus.Tests.Infrastructure;
 public abstract class IntegrationTestBase : IClassFixture<VyaaparNexusFactory>, IDisposable
 {
     protected readonly HttpClient Client;
-    protected readonly AppDbContext Db;
-    private readonly IServiceScope _scope;
+    public VyaaparNexusFactory Factory { get; }
 
     protected IntegrationTestBase(VyaaparNexusFactory factory)
     {
+        Factory = factory;
         Client = factory.CreateClient();
         Client.DefaultRequestHeaders.Add("X-Api-Key", "vyaaparnexus-demo-key-2026");
+    }
 
-        _scope = factory.Services.CreateScope();
-        Db = _scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    protected AppDbContext GetDb()
+    {
+        // Creates a new scope each time this is called to avoid concurrency and stale data issues
+        var scope = Factory.Services.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<AppDbContext>();
     }
 
     protected async Task<SagaStateDto> PollSagaUntilTerminal(
@@ -41,7 +45,6 @@ public abstract class IntegrationTestBase : IClassFixture<VyaaparNexusFactory>, 
 
     public void Dispose()
     {
-        _scope.Dispose();
         Client.Dispose();
     }
 }

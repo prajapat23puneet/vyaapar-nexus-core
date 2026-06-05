@@ -23,7 +23,8 @@
 
     /* Paths */
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@vyaapar-nexus/shared-types": ["../../packages/shared-types/index.ts"]
     }
   },
   "include": ["src"]
