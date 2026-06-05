@@ -29,15 +29,30 @@ public abstract class IntegrationTestBase : IClassFixture<VyaaparNexusFactory>, 
         int timeoutSeconds = 30)
     {
         var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+        var start = DateTime.UtcNow;
+        var lastPrint = DateTime.UtcNow;
+        SagaStateDto? saga = null;
+
         while (DateTime.UtcNow < deadline)
         {
             var response = await Client.GetAsync($"/api/v1/orders/{orderId}/saga");
             if (response.IsSuccessStatusCode)
             {
-                var saga = await response.Content.ReadFromJsonAsync<SagaStateDto>();
+                saga = await response.Content.ReadFromJsonAsync<SagaStateDto>();
                 if (saga?.CurrentState is "OrderCompleted" or "OrderCancelled")
                     return saga;
             }
+
+            // Change 8 — print progress every 5 seconds so the inline log shows how far the saga got
+            var now = DateTime.UtcNow;
+            if ((now - lastPrint).TotalSeconds >= 5)
+            {
+                var elapsed = now - start;
+                Console.WriteLine(
+                    $"[PollSaga] orderId={orderId} elapsed={elapsed.TotalSeconds:F0}s state={saga?.CurrentState ?? "pending"}");
+                lastPrint = now;
+            }
+
             await Task.Delay(500);
         }
         throw new TimeoutException($"Saga for order {orderId} did not reach terminal state within {timeoutSeconds}s");

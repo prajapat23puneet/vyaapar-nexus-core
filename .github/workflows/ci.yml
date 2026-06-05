@@ -51,16 +51,74 @@ jobs:
     - name: Restore Backend Dependencies
       run: dotnet restore apps/api/VyaaparNexus.slnx
 
-    - name: Build Backend
-      run: dotnet build apps/api/VyaaparNexus.slnx --no-restore -c Release
+    # Change 5 — Smoke-check: catch compile errors before any test step
+    - name: Verify — Solution Builds Clean
+      run: |
+        dotnet build apps/api/VyaaparNexus.slnx -c Release --no-incremental 2>&1 | tee build-output.txt
+        grep -c "error" build-output.txt && echo "Build errors found" && exit 1 || echo "Build clean"
 
-    - name: Test Backend
-      run: dotnet test apps/api/VyaaparNexus.slnx --no-build -c Release --verbosity normal --logger trx
+    # Change 6 — Pre-pull Testcontainer images to avoid saga timeouts eating download time
+    - name: Verify — Docker Available
+      run: |
+        docker info
+        docker pull postgres:16-alpine &
+        docker pull rabbitmq:3.13-management-alpine &
+        docker pull redis:7-alpine &
+        wait
+        echo "All Testcontainer images pre-pulled"
 
+    # Change 1 & 4 — Split test steps; each has dual loggers and continue-on-error: false
+    - name: Test — Seed & Auth
+      continue-on-error: false
+      run: >
+        dotnet test apps/api/VyaaparNexus.slnx
+        --no-build -c Release
+        --filter "FullyQualifiedName~VyaaparNexus.Tests.Seed|FullyQualifiedName~VyaaparNexus.Tests.Api"
+        --logger "trx;LogFileName=seed-auth.trx"
+        --logger "console;verbosity=detailed"
+        --results-directory "TestResults/${{ github.run_id }}"
+
+    - name: Test — Products & Customers
+      continue-on-error: false
+      run: >
+        dotnet test apps/api/VyaaparNexus.slnx
+        --no-build -c Release
+        --filter "FullyQualifiedName~VyaaparNexus.Tests.Api.ProductsApiTests|FullyQualifiedName~VyaaparNexus.Tests.Api.CustomersApiTests"
+        --logger "trx;LogFileName=products-customers.trx"
+        --logger "console;verbosity=detailed"
+        --results-directory "TestResults/${{ github.run_id }}"
+
+    - name: Test — Saga Happy Path
+      continue-on-error: false
+      run: >
+        dotnet test apps/api/VyaaparNexus.slnx
+        --no-build -c Release
+        --filter "FullyQualifiedName~VyaaparNexus.Tests.Saga.HappyPathSagaTests"
+        --logger "trx;LogFileName=saga-happy.trx"
+        --logger "console;verbosity=detailed"
+        --results-directory "TestResults/${{ github.run_id }}"
+
+    - name: Test — Saga Failure Paths
+      continue-on-error: false
+      run: >
+        dotnet test apps/api/VyaaparNexus.slnx
+        --no-build -c Release
+        --filter "FullyQualifiedName~VyaaparNexus.Tests.Saga.InventoryFailureSagaTests|FullyQualifiedName~VyaaparNexus.Tests.Saga.PaymentFailureSagaTests"
+        --logger "trx;LogFileName=saga-failure.trx"
+        --logger "console;verbosity=detailed"
+        --results-directory "TestResults/${{ github.run_id }}"
+
+    # Change 2 — Upload all TRX artifacts even when a test step fails
     - name: Upload Test Results
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test-results
-        path: '**/TestResults/**/*.trx'
+        name: test-results-${{ github.run_id }}
+        path: TestResults/${{ github.run_id }}/**/*.trx
 
+    # Change 3 — Print failing test names directly to the PR checks summary page
+    - name: Print Failing Tests to Summary
+      if: failure()
+      run: |
+        echo "## Failed Tests" >> $GITHUB_STEP_SUMMARY
+        grep -r 'outcome="Failed"' TestResults/ | grep -o 'testName="[^"]*"' | sort -u >> $GITHUB_STEP_SUMMARY || echo "No TRX files found" >> $GITHUB_STEP_SUMMARY

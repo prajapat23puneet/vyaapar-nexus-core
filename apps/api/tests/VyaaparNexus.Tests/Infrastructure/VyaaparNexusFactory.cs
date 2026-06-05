@@ -29,24 +29,41 @@ public class VyaaparNexusFactory : WebApplicationFactory<Program>, IAsyncLifetim
 
     public async Task InitializeAsync()
     {
-        await _postgres.StartAsync();
-        await _rabbit.StartAsync();
-        await _redis.StartAsync();
-
-        CreateClient();
-
-        using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await db.Database.MigrateAsync();
-        
-        var basePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "VyaaparNexus.Infrastructure"));
-        if (!Directory.Exists(basePath))
+        // Change 7 — wrap entire body so factory failures surface as a single clear error
+        try
         {
-            basePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "VyaaparNexus.Infrastructure"));
-        }
-        await DatabaseSeeder.SeedAsync(db, basePath);
+            await _postgres.StartAsync();
+            await _rabbit.StartAsync();
+            await _redis.StartAsync();
 
-        await Task.Delay(3000);
+            CreateClient();
+
+            using var scope = Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Database.MigrateAsync();
+
+            var basePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "VyaaparNexus.Infrastructure"));
+            if (!Directory.Exists(basePath))
+            {
+                basePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "VyaaparNexus.Infrastructure"));
+            }
+            await DatabaseSeeder.SeedAsync(db, basePath);
+
+            // Change 7 — verify seeding actually populated data; fail fast with a clear message
+            var categoryCount = await db.Categories.CountAsync();
+            if (categoryCount < 7)
+                throw new InvalidOperationException(
+                    $"[VyaaparNexusFactory] Seeding failed — categories count is {categoryCount}, expected >= 7. " +
+                    $"Seed path resolved to: {basePath}");
+
+            await Task.Delay(3000);
+        }
+        catch (Exception ex)
+        {
+            await Console.Error.WriteLineAsync(
+                $"[VyaaparNexusFactory] INIT FAILED: {ex.GetType().Name} — {ex.Message}\n{ex.StackTrace}");
+            throw;
+        }
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
