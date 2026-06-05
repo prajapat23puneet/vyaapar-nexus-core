@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
+using VyaaparNexus.Infrastructure.HostedServices;
 using VyaaparNexus.Infrastructure.Persistence;
 using VyaaparNexus.Infrastructure.Persistence.Seed;
 
@@ -29,7 +30,8 @@ public class VyaaparNexusFactory : WebApplicationFactory<Program>, IAsyncLifetim
 
     public async Task InitializeAsync()
     {
-        // Change 7 — wrap entire body so factory failures surface as a single clear error
+        // Wrap entire body so factory failures surface as a single clear error
+        // rather than a cascade of confusing assertion failures downstream.
         try
         {
             await _postgres.StartAsync();
@@ -40,23 +42,33 @@ public class VyaaparNexusFactory : WebApplicationFactory<Program>, IAsyncLifetim
 
             using var scope = Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            await db.Database.MigrateAsync();
 
-            var basePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "VyaaparNexus.Infrastructure"));
+            // Bug 1 fix: MigrateAsync is intentionally NOT called here.
+            // DatabaseSeeder.SeedAsync owns migration as its very first step.
+            // Calling it twice here is redundant and could mask migration timing issues.
+
+            // Correct: go up 6 levels from bin/Release/net8.0/ to repo root's apps/api/
+            var basePath = Path.GetFullPath(Path.Combine(
+                AppContext.BaseDirectory,
+                "..", "..", "..", "..", "..",         // → apps/api/
+                "VyaaparNexus.Infrastructure"         // → apps/api/VyaaparNexus.Infrastructure
+            ));
+
             if (!Directory.Exists(basePath))
-            {
-                basePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "VyaaparNexus.Infrastructure"));
-            }
+                throw new DirectoryNotFoundException(
+                    $"[VyaaparNexusFactory] Infrastructure project not found at: {basePath}");
+
             await DatabaseSeeder.SeedAsync(db, basePath);
 
-            // Change 7 — verify seeding actually populated data; fail fast with a clear message
+            // Verify seeding actually populated data; fail fast with a precise message
+            // instead of letting every test report "Expected >= 7 but was 0".
             var categoryCount = await db.Categories.CountAsync();
             if (categoryCount < 7)
                 throw new InvalidOperationException(
                     $"[VyaaparNexusFactory] Seeding failed — categories count is {categoryCount}, expected >= 7. " +
                     $"Seed path resolved to: {basePath}");
 
-            await Task.Delay(3000);
+            await Task.Delay(5000);
         }
         catch (Exception ex)
         {
@@ -84,11 +96,21 @@ public class VyaaparNexusFactory : WebApplicationFactory<Program>, IAsyncLifetim
 
         builder.ConfigureTestServices(services =>
         {
-            var descriptors = services.Where(d => d.ServiceType == typeof(IHostedService)).ToList();
-            foreach (var descriptor in descriptors)
-            {
-                services.Remove(descriptor);
-            }
+            // ROOT CAUSE FIX for saga timeouts:
+            //
+            // The original code removed ALL IHostedService registrations. This killed:
+            //   1. MassTransit's bus host → consumers never bind → no messages delivered
+            //   2. OutboxPublisherService → OrderCreated never leaves the outbox table
+            //      → OrderCreatedConsumer never fires → saga stuck at "Submitted" forever
+            //
+            // OutboxPublisherService MUST remain running in tests because
+            // CreateOrderCommandHandler writes to the outbox table (not IBus.Publish directly).
+            // The outbox-to-RabbitMQ relay is what triggers the entire consumer chain.
+            //
+            // Only MetricsSnapshotService is safe to remove — it has no role in saga flow
+            // and only produces background noise in test logs.
+            services.Remove(services.Single(d =>
+                d.ImplementationType == typeof(MetricsSnapshotService)));
         });
     }
 
@@ -100,4 +122,3 @@ public class VyaaparNexusFactory : WebApplicationFactory<Program>, IAsyncLifetim
         await base.DisposeAsync();
     }
 }
-

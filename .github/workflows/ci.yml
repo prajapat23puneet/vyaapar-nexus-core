@@ -55,7 +55,15 @@ jobs:
     - name: Verify — Solution Builds Clean
       run: |
         dotnet build apps/api/VyaaparNexus.slnx -c Release --no-incremental 2>&1 | tee build-output.txt
-        grep -c "error" build-output.txt && echo "Build errors found" && exit 1 || echo "Build clean"
+        # Bug 3 fix: grep for the exact MSBuild failure summary line "Build FAILED".
+        # The previous "grep -c error" also matched "0 Error(s)" on a clean build,
+        # causing a false CI failure. "Build FAILED" only appears on actual failures.
+        if grep -q "^Build FAILED" build-output.txt; then
+          echo "Build errors found — see build-output.txt above"
+          exit 1
+        fi
+        echo "Build clean"
+
 
     # Change 6 — Pre-pull Testcontainer images to avoid saga timeouts eating download time
     - name: Verify — Docker Available

@@ -7,4 +7,6 @@ repomix-output.xml
 .vscode/
 .gitignore
 repomix-out.xml
+apps/api/tests/VyaaparNexus.Tests/TestResults/
 .gitignore
+op.txt
