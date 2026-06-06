@@ -22,10 +22,13 @@ public class VyaaparNexusFactory : WebApplicationFactory<Program>, IAsyncLifetim
 
     private readonly RabbitMqContainer _rabbit = new RabbitMqBuilder()
         .WithImage("rabbitmq:3.13-management-alpine")
+        .WithWaitStrategy(DotNet.Testcontainers.Builders.Wait.ForUnixContainer().UntilMessageIsLogged("Server startup complete"))
         .Build();
 
     private readonly RedisContainer _redis = new RedisBuilder()
         .WithImage("redis:7-alpine")
+        .WithPortBinding(6379, true)
+        .WithWaitStrategy(DotNet.Testcontainers.Builders.Wait.ForUnixContainer().UntilMessageIsLogged("Ready to accept connections"))
         .Build();
 
     public async Task InitializeAsync()
@@ -47,16 +50,8 @@ public class VyaaparNexusFactory : WebApplicationFactory<Program>, IAsyncLifetim
             // DatabaseSeeder.SeedAsync owns migration as its very first step.
             // Calling it twice here is redundant and could mask migration timing issues.
 
-            // Correct: go up 6 levels from bin/Release/net8.0/ to repo root's apps/api/
-            var basePath = Path.GetFullPath(Path.Combine(
-                AppContext.BaseDirectory,
-                "..", "..", "..", "..", "..",         // → apps/api/
-                "VyaaparNexus.Infrastructure"         // → apps/api/VyaaparNexus.Infrastructure
-            ));
-
-            if (!Directory.Exists(basePath))
-                throw new DirectoryNotFoundException(
-                    $"[VyaaparNexusFactory] Infrastructure project not found at: {basePath}");
+            // Removed old path hack; DatabaseSeeder now uses Assembly.Location natively
+            var basePath = AppContext.BaseDirectory;
 
             await DatabaseSeeder.SeedAsync(db, basePath);
 

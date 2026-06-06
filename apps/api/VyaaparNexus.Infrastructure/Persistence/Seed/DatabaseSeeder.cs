@@ -13,8 +13,11 @@ namespace VyaaparNexus.Infrastructure.Persistence.Seed;
 
 public static class DatabaseSeeder
 {
-    public static async Task SeedAsync(AppDbContext context, string basePath)
+    public static async Task SeedAsync(AppDbContext context, string basePath = "")
     {
+        var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+        var baseDir = System.IO.Path.GetDirectoryName(assembly.Location);
+        basePath = baseDir ?? AppContext.BaseDirectory;
         await context.Database.MigrateAsync();
 
         if (!await context.ApiKeys.AnyAsync())

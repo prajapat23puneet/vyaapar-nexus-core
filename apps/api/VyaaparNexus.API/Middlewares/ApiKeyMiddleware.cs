@@ -55,7 +55,16 @@ public class ApiKeyMiddleware
         var redisService = context.RequestServices.GetRequiredService<IRedisService>();
 
         // Check Redis first — cache hit means no DB round-trip at all
-        var cached = await redisService.GetAsync<bool?>(cacheKey);
+        bool? cached = null;
+        try
+        {
+            cached = await redisService.GetAsync<bool?>(cacheKey);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Redis cache unavailable. Falling back to DB.");
+        }
+
         if (cached == true)
         {
             await _next(context);
@@ -77,7 +86,14 @@ public class ApiKeyMiddleware
         }
 
         // Cache valid status so subsequent requests skip the DB entirely
-        await redisService.SetAsync(cacheKey, true, CacheTtl);
+        try
+        {
+            await redisService.SetAsync(cacheKey, true, CacheTtl);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to write to Redis cache.");
+        }
 
         apiKey.LastUsed = DateTimeOffset.UtcNow;
         await dbContext.SaveChangesAsync();

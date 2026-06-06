@@ -25,6 +25,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\..\VyaaparNexus.Infrastructure\Persistence\Seed\*.seed.json" Link="Persistence\Seed\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\VyaaparNexus.API\VyaaparNexus.API.csproj" />
   </ItemGroup>
 
