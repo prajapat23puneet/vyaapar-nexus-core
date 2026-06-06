@@ -15,9 +15,16 @@ public static class DatabaseSeeder
 {
     public static async Task SeedAsync(AppDbContext context, string basePath = "")
     {
-        var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-        var baseDir = System.IO.Path.GetDirectoryName(assembly.Location);
-        basePath = baseDir ?? AppContext.BaseDirectory;
+        // Use the caller-supplied basePath when it is non-empty (e.g. from the test
+        // factory which passes AppContext.BaseDirectory where seed files are copied).
+        // Only fall back to the executing assembly's directory when nothing was passed,
+        // which is the correct behaviour for the production API startup path.
+        if (string.IsNullOrWhiteSpace(basePath))
+        {
+            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+            var baseDir = System.IO.Path.GetDirectoryName(assembly.Location);
+            basePath = baseDir ?? AppContext.BaseDirectory;
+        }
         await context.Database.MigrateAsync();
 
         if (!await context.ApiKeys.AnyAsync())
