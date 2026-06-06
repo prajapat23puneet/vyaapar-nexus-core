@@ -12,6 +12,17 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:latest
+        ports:
+          - 6379:6379
+      rabbitmq:
+        image: rabbitmq:3-management
+        ports:
+          - 5672:5672
+          
     env:
       TESTCONTAINERS_RYUK_DISABLED: true
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
