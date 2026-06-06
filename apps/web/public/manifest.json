@@ -1,0 +1,21 @@
+{
+  "name": "VyaaparNexus | Live Distributed Order Orchestrator",
+  "short_name": "VyaaparNexus",
+  "description": "A live distributed e-commerce order orchestrator showcasing real-time saga completion, compensating transactions, and resilience behavior.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#863bff",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

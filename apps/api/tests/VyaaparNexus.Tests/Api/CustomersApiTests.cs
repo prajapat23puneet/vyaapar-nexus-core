@@ -46,7 +46,7 @@ public class CustomersApiTests : IntegrationTestBase
     [Fact]
     public async Task UpdateCustomer_Returns200()
     {
-        var customer = await Db.Customers.FirstAsync();
+        var customer = await GetDb().Customers.FirstAsync();
         var id = customer.Id;
         var newName = "Updated Name " + Guid.NewGuid();
 
@@ -61,8 +61,9 @@ public class CustomersApiTests : IntegrationTestBase
         var response = await Client.PutAsJsonAsync($"/api/v1/customers/{id}", request);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        Db.ChangeTracker.Clear();
-        var updatedCustomer = await Db.Customers.FirstAsync(x => x.Id == id);
+        GetDb().ChangeTracker.Clear();
+        var updatedCustomer = await GetDb().Customers.FirstAsync(x => x.Id == id);
         updatedCustomer.Name.Should().Be(newName);
     }
 }
+

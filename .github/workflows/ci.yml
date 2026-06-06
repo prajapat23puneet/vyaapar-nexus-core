@@ -2,81 +2,131 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [ "main" ]
   pull_request:
-    branches: [main]
+    branches: [ "main" ]
+
+permissions:
+  contents: read
 
 jobs:
-  backend:
+  test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: vyaaparnexus_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      rabbitmq:
-        image: rabbitmq:3.13-management-alpine
-        ports:
-          - 5672:5672
-          - 15672:15672
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-
+    env:
+      TESTCONTAINERS_RYUK_DISABLED: true
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
 
-      - name: Restore dependencies
-        run: dotnet restore apps/api/VyaaparNexus.slnx
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+        
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v3
+      with:
+        version: 9
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'pnpm'
 
-      - name: Build
-        run: dotnet build apps/api/VyaaparNexus.slnx --no-restore --configuration Release
+    - name: Install Frontend Dependencies
+      run: pnpm install --filter web
+      
+    - name: Build Frontend
+      run: pnpm --filter web build
+      env:
+        VITE_API_URL: "https://placeholder.example.com"
+        VITE_API_KEY: "ci-placeholder-key"
 
-      - name: Test
-        run: dotnet test apps/api/VyaaparNexus.slnx --no-build --configuration Release --verbosity normal
-        env:
-          DATABASE_URL: "Host=localhost;Port=5432;Database=vyaaparnexus_test;Username=postgres;Password=postgres"
-          RABBITMQ_URL: "amqp://guest:guest@localhost:5672"
-          REDIS_URL: "localhost:6379"
+    - name: Restore Backend Dependencies
+      run: dotnet restore apps/api/VyaaparNexus.slnx
 
-  frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    # Change 5 — Smoke-check: catch compile errors before any test step
+    - name: Verify — Solution Builds Clean
+      run: |
+        dotnet build apps/api/VyaaparNexus.slnx -c Release --no-incremental 2>&1 | tee build-output.txt
+        # Bug 3 fix: grep for the exact MSBuild failure summary line "Build FAILED".
+        # The previous "grep -c error" also matched "0 Error(s)" on a clean build,
+        # causing a false CI failure. "Build FAILED" only appears on actual failures.
+        if grep -q "^Build FAILED" build-output.txt; then
+          echo "Build errors found — see build-output.txt above"
+          exit 1
+        fi
+        echo "Build clean"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
+    # Change 6 — Pre-pull Testcontainer images to avoid saga timeouts eating download time
+    - name: Verify — Docker Available
+      run: |
+        docker info
+        docker pull postgres:16-alpine &
+        docker pull rabbitmq:3.13-management-alpine &
+        docker pull redis:7-alpine &
+        wait
+        echo "All Testcontainer images pre-pulled"
 
-      - name: Install dependencies
-        run: pnpm install
+    # Change 1 & 4 — Split test steps; each has dual loggers and continue-on-error: false
+    - name: Test — Seed & Auth
+      continue-on-error: false
+      run: >
+        dotnet test apps/api/VyaaparNexus.slnx
+        --no-build -c Release
+        --filter "FullyQualifiedName~VyaaparNexus.Tests.Seed|FullyQualifiedName~VyaaparNexus.Tests.Api"
+        --logger "trx;LogFileName=seed-auth.trx"
+        --logger "console;verbosity=detailed"
+        --results-directory "TestResults/${{ github.run_id }}"
 
-      - name: Type check frontend
-        run: pnpm --filter web exec tsc --noEmit
+    - name: Test — Products & Customers
+      continue-on-error: false
+      run: >
+        dotnet test apps/api/VyaaparNexus.slnx
+        --no-build -c Release
+        --filter "FullyQualifiedName~VyaaparNexus.Tests.Api.ProductsApiTests|FullyQualifiedName~VyaaparNexus.Tests.Api.CustomersApiTests"
+        --logger "trx;LogFileName=products-customers.trx"
+        --logger "console;verbosity=detailed"
+        --results-directory "TestResults/${{ github.run_id }}"
 
-      - name: Build frontend
-        run: pnpm --filter web build
-        env:
-          VITE_API_URL: http://localhost:5000
-          VITE_API_KEY: vyaaparnexus-demo-key-2026
+    - name: Test — Saga Happy Path
+      continue-on-error: false
+      run: >
+        dotnet test apps/api/VyaaparNexus.slnx
+        --no-build -c Release
+        --filter "FullyQualifiedName~VyaaparNexus.Tests.Saga.HappyPathSagaTests"
+        --logger "trx;LogFileName=saga-happy.trx"
+        --logger "console;verbosity=detailed"
+        --results-directory "TestResults/${{ github.run_id }}"
+
+    - name: Test — Saga Failure Paths
+      continue-on-error: false
+      run: >
+        dotnet test apps/api/VyaaparNexus.slnx
+        --no-build -c Release
+        --filter "FullyQualifiedName~VyaaparNexus.Tests.Saga.InventoryFailureSagaTests|FullyQualifiedName~VyaaparNexus.Tests.Saga.PaymentFailureSagaTests"
+        --logger "trx;LogFileName=saga-failure.trx"
+        --logger "console;verbosity=detailed"
+        --results-directory "TestResults/${{ github.run_id }}"
+
+    # Change 2 — Upload all TRX artifacts even when a test step fails
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-${{ github.run_id }}
+        path: TestResults/${{ github.run_id }}/**/*.trx
+
+    # Change 3 — Print failing test names directly to the PR checks summary page
+    - name: Print Failing Tests to Summary
+      if: failure()
+      run: |
+        echo "## Failed Tests" >> $GITHUB_STEP_SUMMARY
+        grep -r 'outcome="Failed"' TestResults/ | grep -o 'testName="[^"]*"' | sort -u >> $GITHUB_STEP_SUMMARY || echo "No TRX files found" >> $GITHUB_STEP_SUMMARY

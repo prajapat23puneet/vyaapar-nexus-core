@@ -1,4 +1,5 @@
 import React from 'react'
+import { Helmet } from 'react-helmet-async'
 import { MetricCards } from '../components/MetricCards'
 import { ServiceMesh } from '../components/ServiceMesh'
 import { DemoOrderPanel } from '../components/DemoOrderPanel'
@@ -8,6 +9,10 @@ import { LogTerminal } from '../components/LogTerminal'
 export function Dashboard() {
   return (
     <div className="flex flex-col gap-5">
+      <Helmet>
+        <title>Dashboard | VyaaparNexus</title>
+        <meta name="description" content="View live business metrics and order orchestration flow." />
+      </Helmet>
       {/* ── Row 1: KPI Metric Cards ──────────────────────────────────────── */}
       <section aria-label="Key Performance Indicators">
         <MetricCards />

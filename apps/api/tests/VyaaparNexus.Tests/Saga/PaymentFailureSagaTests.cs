@@ -15,7 +15,7 @@ public class PaymentFailureSagaTests : IntegrationTestBase
 
     private async Task<ProductDto> CreateDedicatedProduct(string sku)
     {
-        var category = await Db.Categories.FirstAsync();
+        var category = await GetDb().Categories.FirstAsync();
         var createResp = await Client.PostAsJsonAsync("/api/v1/products", new CreateProductRequest
         {
             CategoryId = category.Id,
@@ -33,7 +33,7 @@ public class PaymentFailureSagaTests : IntegrationTestBase
     public async Task PaymentFailure_SagaReachesOrderCancelled_StockRestored()
     {
         var product = await CreateDedicatedProduct($"PF-SAGA-A-{Guid.NewGuid():N}");
-        var customer = await Db.Customers.FirstAsync();
+        var customer = await GetDb().Customers.FirstAsync();
 
         var request = new CreateOrderRequest
         {
@@ -65,8 +65,8 @@ public class PaymentFailureSagaTests : IntegrationTestBase
 
         // Stock must be fully restored after compensation — give consumer a moment to complete
         await Task.Delay(2000);
-        Db.ChangeTracker.Clear();
-        var finalProduct = await Db.Products.FirstAsync(x => x.Id == product.Id);
+        GetDb().ChangeTracker.Clear();
+        var finalProduct = await GetDb().Products.FirstAsync(x => x.Id == product.Id);
         finalProduct.StockQuantity.Should().Be(50); // started at 50, reserved then restored
     }
 
@@ -74,7 +74,7 @@ public class PaymentFailureSagaTests : IntegrationTestBase
     public async Task PaymentFailure_TraceContainsCompensationSteps()
     {
         var product = await CreateDedicatedProduct($"PF-SAGA-B-{Guid.NewGuid():N}");
-        var customer = await Db.Customers.FirstAsync();
+        var customer = await GetDb().Customers.FirstAsync();
 
         var request = new CreateOrderRequest
         {
@@ -111,3 +111,4 @@ public class PaymentFailureSagaTests : IntegrationTestBase
         );
     }
 }
+

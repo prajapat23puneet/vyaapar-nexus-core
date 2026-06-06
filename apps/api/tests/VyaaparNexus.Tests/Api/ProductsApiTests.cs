@@ -36,7 +36,7 @@ public class ProductsApiTests : IntegrationTestBase
     public async Task StockPatch_UpdatesCorrectly()
     {
         // Create a dedicated product for this test — fully isolated from seeded products
-        var category = await Db.Categories.FirstAsync();
+        var category = await GetDb().Categories.FirstAsync();
         var createResp = await Client.PostAsJsonAsync("/api/v1/products", new CreateProductRequest
         {
             CategoryId = category.Id,
@@ -65,7 +65,7 @@ public class ProductsApiTests : IntegrationTestBase
     [Fact]
     public async Task SoftDelete_HidesProductFromActiveList()
     {
-        var category = await Db.Categories.FirstAsync();
+        var category = await GetDb().Categories.FirstAsync();
 
         var createResponse = await Client.PostAsJsonAsync("/api/v1/products", new CreateProductRequest
         {
@@ -87,3 +87,4 @@ public class ProductsApiTests : IntegrationTestBase
         result!.Items.Should().NotContain(x => x.Id == newProductId);
     }
 }
+

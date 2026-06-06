@@ -3,4 +3,5 @@
   <Project Path="VyaaparNexus.Application/VyaaparNexus.Application.csproj" />
   <Project Path="VyaaparNexus.Domain/VyaaparNexus.Domain.csproj" />
   <Project Path="VyaaparNexus.Infrastructure/VyaaparNexus.Infrastructure.csproj" />
+  <Project Path="tests/VyaaparNexus.Tests/VyaaparNexus.Tests.csproj" />
 </Solution>

@@ -1,4 +1,5 @@
 import React from 'react'
+import { Helmet } from 'react-helmet-async'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { PagedResult, Product } from '@vyaapar-nexus/shared-types'
@@ -18,6 +19,10 @@ export function Products() {
 
   return (
     <div className="space-y-6">
+      <Helmet>
+        <title>Products | VyaaparNexus</title>
+        <meta name="description" content="View product inventory and stock levels." />
+      </Helmet>
       <div className="flex items-center justify-between border-b border-border pb-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground my-1 flex items-center gap-2">

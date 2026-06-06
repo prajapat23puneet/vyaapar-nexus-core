@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Data.Common;
+using Polly;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -67,7 +70,16 @@ public sealed class OutboxPublisherService : BackgroundService
         {
             try
             {
-                await DrainBatchAsync(stoppingToken);
+                var retryPolicy = Policy
+                    .Handle<DbException>()
+                    .Or<EndOfStreamException>()
+                    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)), 
+                        (exception, timeSpan, retryCount, context) =>
+                        {
+                            _logger.LogWarning(exception, "Error in OutboxPublisherService, retrying in {TimeSpan} (Attempt {RetryCount})", timeSpan, retryCount);
+                        });
+
+                await retryPolicy.ExecuteAsync(async () => await DrainBatchAsync(stoppingToken));
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

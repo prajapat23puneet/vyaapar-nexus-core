@@ -1,11 +1,14 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
+using VyaaparNexus.Infrastructure.HostedServices;
 using VyaaparNexus.Infrastructure.Persistence;
 using VyaaparNexus.Infrastructure.Persistence.Seed;
 
@@ -19,38 +22,55 @@ public class VyaaparNexusFactory : WebApplicationFactory<Program>, IAsyncLifetim
 
     private readonly RabbitMqContainer _rabbit = new RabbitMqBuilder()
         .WithImage("rabbitmq:3.13-management-alpine")
+        .WithWaitStrategy(DotNet.Testcontainers.Builders.Wait.ForUnixContainer().UntilMessageIsLogged("Server startup complete"))
         .Build();
 
     private readonly RedisContainer _redis = new RedisBuilder()
         .WithImage("redis:7-alpine")
+        .WithPortBinding(6379, true)
+        .WithWaitStrategy(DotNet.Testcontainers.Builders.Wait.ForUnixContainer().UntilMessageIsLogged("Ready to accept connections"))
         .Build();
 
     public async Task InitializeAsync()
     {
-        await _postgres.StartAsync();
-        await _rabbit.StartAsync();
-        await _redis.StartAsync();
-
-        // Ensure App is built so services are available to run migrations
-        _ = Server;
-
-        using var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await db.Database.MigrateAsync();
-        
-        // Use DatabaseSeeder logic here. It's normally a static class in this setup (from Program.cs view)
-        // Wait, from Program.cs: `await DatabaseSeeder.SeedAsync(context, basePath);`
-        // We can just call it here.
-        var basePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "VyaaparNexus.Infrastructure"));
-        // Check if we need a valid basePath for seed data. In tests, we might need to point to where seed files are.
-        // The VyaaparNexusFactory runs in tests bin folder.
-        // Let's copy SeedData to tests or point correctly. 
-        // A better approach is to rely on the seeder if it creates data without files or find the correct path.
-        if (!Directory.Exists(basePath))
+        // Wrap entire body so factory failures surface as a single clear error
+        // rather than a cascade of confusing assertion failures downstream.
+        try
         {
-            basePath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "VyaaparNexus.Infrastructure"));
+            await _postgres.StartAsync();
+            await _rabbit.StartAsync();
+            await _redis.StartAsync();
+
+            CreateClient();
+
+            using var scope = Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            // Bug 1 fix: MigrateAsync is intentionally NOT called here.
+            // DatabaseSeeder.SeedAsync owns migration as its very first step.
+            // Calling it twice here is redundant and could mask migration timing issues.
+
+            // Removed old path hack; DatabaseSeeder now uses Assembly.Location natively
+            var basePath = AppContext.BaseDirectory;
+
+            await DatabaseSeeder.SeedAsync(db, basePath);
+
+            // Verify seeding actually populated data; fail fast with a precise message
+            // instead of letting every test report "Expected >= 7 but was 0".
+            var categoryCount = await db.Categories.CountAsync();
+            if (categoryCount < 7)
+                throw new InvalidOperationException(
+                    $"[VyaaparNexusFactory] Seeding failed — categories count is {categoryCount}, expected >= 7. " +
+                    $"Seed path resolved to: {basePath}");
+
+            await Task.Delay(5000);
         }
-        await DatabaseSeeder.SeedAsync(db, basePath);
+        catch (Exception ex)
+        {
+            await Console.Error.WriteLineAsync(
+                $"[VyaaparNexusFactory] INIT FAILED: {ex.GetType().Name} — {ex.Message}\n{ex.StackTrace}");
+            throw;
+        }
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -62,11 +82,30 @@ public class VyaaparNexusFactory : WebApplicationFactory<Program>, IAsyncLifetim
                 ["DATABASE_URL"] = _postgres.GetConnectionString(),
                 ["DATABASE_MIGRATION_URL"] = _postgres.GetConnectionString(),
                 ["RABBITMQ_URL"] = _rabbit.GetConnectionString(),
-                ["REDIS_URL"] = _redis.GetConnectionString(),
+                ["Redis:ConnectionString"] = _redis.GetConnectionString(),
                 ["ASPNETCORE_ENVIRONMENT"] = "Testing",
                 ["SEED_API_KEY"] = "vyaaparnexus-demo-key-2026",
                 ["FrontendUrl"] = "http://localhost:5173"
             });
+        });
+
+        builder.ConfigureTestServices(services =>
+        {
+            // ROOT CAUSE FIX for saga timeouts:
+            //
+            // The original code removed ALL IHostedService registrations. This killed:
+            //   1. MassTransit's bus host → consumers never bind → no messages delivered
+            //   2. OutboxPublisherService → OrderCreated never leaves the outbox table
+            //      → OrderCreatedConsumer never fires → saga stuck at "Submitted" forever
+            //
+            // OutboxPublisherService MUST remain running in tests because
+            // CreateOrderCommandHandler writes to the outbox table (not IBus.Publish directly).
+            // The outbox-to-RabbitMQ relay is what triggers the entire consumer chain.
+            //
+            // Only MetricsSnapshotService is safe to remove — it has no role in saga flow
+            // and only produces background noise in test logs.
+            services.Remove(services.Single(d =>
+                d.ImplementationType == typeof(MetricsSnapshotService)));
         });
     }
 

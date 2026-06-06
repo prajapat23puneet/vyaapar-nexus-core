@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Helmet } from 'react-helmet-async'
 import { useQuery } from '@tanstack/react-query'
 import { useDispatch } from 'react-redux'
 import { api } from '../api/client'
@@ -51,6 +52,10 @@ export function Orders() {
 
   return (
     <div className="space-y-6 relative">
+      <Helmet>
+        <title>Orders | VyaaparNexus</title>
+        <meta name="description" content="Manage and view live order statuses." />
+      </Helmet>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border pb-4">
         <div>

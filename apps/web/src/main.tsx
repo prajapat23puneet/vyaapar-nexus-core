@@ -12,16 +12,20 @@ import './index.css';
 // activates all dark-mode custom properties and shadcn sidebar dark tokens.
 document.documentElement.classList.add('dark');
 
+import { HelmetProvider } from 'react-helmet-async';
+
 const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </QueryClientProvider>
-    </Provider>
+    <HelmetProvider>
+      <Provider store={store}>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </QueryClientProvider>
+      </Provider>
+    </HelmetProvider>
   </React.StrictMode>,
 );

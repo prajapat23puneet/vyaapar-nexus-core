@@ -69,6 +69,7 @@ try
                 // Fallback for docker or other environments
                 basePath = AppContext.BaseDirectory;
             }
+            await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.MigrateAsync(context.Database);
             await DatabaseSeeder.SeedAsync(context, basePath);
         }
         catch (Exception ex)

@@ -20,7 +20,7 @@ public static class DependencyInjection
         // ── Database ─────────────────────────────────────────────────────────────
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(
-                configuration.GetConnectionString("DefaultConnection") 
+                configuration["DATABASE_URL"] 
                 ?? Environment.GetEnvironmentVariable("DATABASE_URL") 
                 ?? throw new InvalidOperationException("Database connection string not found.")));
 

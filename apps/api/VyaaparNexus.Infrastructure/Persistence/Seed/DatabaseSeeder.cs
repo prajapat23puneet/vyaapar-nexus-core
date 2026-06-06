@@ -13,8 +13,11 @@ namespace VyaaparNexus.Infrastructure.Persistence.Seed;
 
 public static class DatabaseSeeder
 {
-    public static async Task SeedAsync(AppDbContext context, string basePath)
+    public static async Task SeedAsync(AppDbContext context, string basePath = "")
     {
+        var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+        var baseDir = System.IO.Path.GetDirectoryName(assembly.Location);
+        basePath = baseDir ?? AppContext.BaseDirectory;
         await context.Database.MigrateAsync();
 
         if (!await context.ApiKeys.AnyAsync())
@@ -43,37 +46,52 @@ public static class DatabaseSeeder
         if (!await context.Customers.AnyAsync())
         {
             var path = Path.Combine(basePath, "Persistence", "Seed", "customers.seed.json");
-            if (File.Exists(path))
+
+            // Bug 2 fix: throw instead of silently skipping — a missing seed file means
+            // basePath is wrong and every seed-dependent test will fail with confusing
+            // "Expected >= N but was 0" errors rather than a clear FileNotFoundException.
+            if (!File.Exists(path))
+                throw new FileNotFoundException(
+                    $"[DatabaseSeeder] customers.seed.json not found. " +
+                    $"Resolved path: {path}. " +
+                    $"Check that basePath points to the VyaaparNexus.Infrastructure project root.",
+                    path);
+
+            var json = await File.ReadAllTextAsync(path);
+            var customers = JsonConvert.DeserializeObject<List<Customer>>(json);
+            if (customers != null && customers.Any())
             {
-                var json = await File.ReadAllTextAsync(path);
-                var customers = JsonConvert.DeserializeObject<List<Customer>>(json);
-                if (customers != null && customers.Any())
-                {
-                    context.Customers.AddRange(customers);
-                    await context.SaveChangesAsync();
-                }
+                context.Customers.AddRange(customers);
+                await context.SaveChangesAsync();
             }
         }
 
         if (!await context.Categories.AnyAsync() && !await context.Products.AnyAsync())
         {
             var path = Path.Combine(basePath, "Persistence", "Seed", "products.seed.json");
-            if (File.Exists(path))
+
+            // Bug 2 fix: same rationale — throw so the caller gets a precise error message
+            // with the full path rather than silently seeding zero products/categories.
+            if (!File.Exists(path))
+                throw new FileNotFoundException(
+                    $"[DatabaseSeeder] products.seed.json not found. " +
+                    $"Resolved path: {path}. " +
+                    $"Check that basePath points to the VyaaparNexus.Infrastructure project root.",
+                    path);
+
+            var json = await File.ReadAllTextAsync(path);
+            var root = JsonConvert.DeserializeObject<ProductSeedRoot>(json);
+            if (root != null)
             {
-                var json = await File.ReadAllTextAsync(path);
-                var root = JsonConvert.DeserializeObject<ProductSeedRoot>(json);
-                if (root != null)
+                if (root.Categories != null && root.Categories.Any())
                 {
-                    if (root.Categories != null && root.Categories.Any())
-                    {
-                        context.Categories.AddRange(root.Categories);
-                    }
-                    if (root.Products != null && root.Products.Any())
-                    {
-                        context.Products.AddRange(root.Products);
-                    }
-                    await context.SaveChangesAsync();
+                    context.Categories.AddRange(root.Categories);
                 }
+                if (root.Products != null && root.Products.Any())
+                {
+                    context.Products.AddRange(root.Products);
+                }
+                await context.SaveChangesAsync();
             }
         }
     }

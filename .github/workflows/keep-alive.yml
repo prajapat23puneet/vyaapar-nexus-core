@@ -1,0 +1,16 @@
+name: Keep-Alive
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Every 6 hours
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping API Health Endpoint
+        # Ensure you set API_URL as a repository variable in GitHub Actions
+        # It should be the Railway deployment URL (e.g., https://vyapaar-api-production.up.railway.app)
+        if: vars.API_URL != ''
+        continue-on-error: true
+        run: curl -s -f ${{ vars.API_URL }}/health/live

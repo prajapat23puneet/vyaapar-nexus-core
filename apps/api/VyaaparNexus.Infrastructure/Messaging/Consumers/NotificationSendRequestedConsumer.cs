@@ -23,80 +23,77 @@ public class NotificationSendRequestedConsumer : IConsumer<NotificationSendReque
 
     public async Task Consume(ConsumeContext<NotificationSendRequested> context)
     {
-        var message = context.Message;
-        var consumerName = nameof(NotificationSendRequestedConsumer);
-        var messageId = context.MessageId?.ToString() ?? message.MessageId;
-        var now = DateTimeOffset.UtcNow;
-
-        await using var tx = await _context.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, context.CancellationToken);
-
-        if (await _context.InboxMessages.AnyAsync(i => i.MessageId == messageId && i.ConsumerName == consumerName, context.CancellationToken))
+        var strategy = _context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            await tx.RollbackAsync(context.CancellationToken);
-            return;
-        }
+            var message = context.Message;
+            var consumerName = nameof(NotificationSendRequestedConsumer);
+            var messageId = context.MessageId?.ToString() ?? message.MessageId;
+            var now = DateTimeOffset.UtcNow;
 
-        var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == message.OrderId, context.CancellationToken);
-        var saga = await _context.SagaStates.FirstOrDefaultAsync(s => s.OrderId == message.OrderId, context.CancellationToken);
-        if (order == null || saga == null)
-            return;
+            await using var tx = await _context.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, context.CancellationToken);
 
-        await _notificationService.SendAsync(message.OrderId, message.Channel, message.CustomerEmail, context.CancellationToken);
-
-        var previousState = saga.CurrentState;
-        order.Status = OrderStatus.OrderCompleted;
-        order.CompletedAt = now;
-        order.UpdatedAt = now;
-
-        saga.CurrentState = OrderStatus.OrderCompleted.ToString();
-        saga.NotificationSent = true;
-        saga.CompletedAt = now;
-        saga.DurationMs = (int)(now - saga.StartedAt).TotalMilliseconds;
-
-        _context.SagaEventLogs.AddRange(
-            new SagaEventLog
+            if (await _context.InboxMessages.AnyAsync(i => i.MessageId == messageId && i.ConsumerName == consumerName, context.CancellationToken))
             {
-                CorrelationId = message.CorrelationId,
-                OrderId = message.OrderId,
-                EventType = "NotificationSent",
-                ServiceName = "Notification",
-                PreviousState = previousState,
-                CurrentState = previousState,
-                Message = "Notification sent successfully",
-                CreatedAt = now
-            },
-            new SagaEventLog
+                await tx.RollbackAsync(context.CancellationToken);
+                return;
+            }
+
+            var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == message.OrderId, context.CancellationToken);
+            var saga = await _context.SagaStates.FirstOrDefaultAsync(s => s.OrderId == message.OrderId, context.CancellationToken);
+            if (order == null || saga == null)
+                return;
+
+            await _notificationService.SendAsync(message.OrderId, message.Channel, message.CustomerEmail, context.CancellationToken);
+
+            var previousState = saga.CurrentState;
+            order.Status = OrderStatus.OrderCompleted;
+            order.CompletedAt = now;
+            order.UpdatedAt = now;
+
+            saga.CurrentState = OrderStatus.OrderCompleted.ToString();
+            saga.NotificationSent = true;
+            saga.CompletedAt = now;
+            saga.DurationMs = (int)(now - saga.StartedAt).TotalMilliseconds;
+
+            _context.SagaEventLogs.AddRange(
+                new SagaEventLog
+                {
+                    CorrelationId = message.CorrelationId,
+                    OrderId = message.OrderId,
+                    EventType = "NotificationSent",
+                    ServiceName = "Notification",
+                    PreviousState = previousState,
+                    CurrentState = previousState,
+                    Message = "Notification sent successfully",
+                    CreatedAt = now
+                },
+                new SagaEventLog
+                {
+                    CorrelationId = message.CorrelationId,
+                    OrderId = message.OrderId,
+                    EventType = "OrderCompleted",
+                    ServiceName = "Saga",
+                    PreviousState = previousState,
+                    CurrentState = OrderStatus.OrderCompleted.ToString(),
+                    DurationMs = saga.DurationMs,
+                    Message = "Order saga completed",
+                    CreatedAt = now
+                });
+
+            _context.InboxMessages.Add(new InboxMessage
             {
+                MessageId = messageId,
+                ConsumerName = consumerName,
                 CorrelationId = message.CorrelationId,
-                OrderId = message.OrderId,
-                EventType = "OrderCompleted",
-                ServiceName = "Saga",
-                PreviousState = previousState,
-                CurrentState = OrderStatus.OrderCompleted.ToString(),
-                DurationMs = saga.DurationMs,
-                Message = "Order saga completed",
-                CreatedAt = now
+                ProcessedAt = now
             });
 
-        _context.InboxMessages.Add(new InboxMessage
-        {
-            MessageId = messageId,
-            ConsumerName = consumerName,
-            CorrelationId = message.CorrelationId,
-            ProcessedAt = now
-        });
-
-        try
-        {
             await _context.SaveChangesAsync(context.CancellationToken);
             await tx.CommitAsync(context.CancellationToken);
 
             MetricsRegistry.OrdersCompletedTotal.Inc();
             MetricsRegistry.SagaDurationMs.Observe(saga.DurationMs ?? 0);
-        }
-        catch
-        {
-            throw;
-        }
+        });
     }
 }
