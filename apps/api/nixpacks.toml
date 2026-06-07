@@ -2,7 +2,7 @@
 nixPkgs = ["dotnet-sdk_8"]
 
 [phases.install]
-cmds = ["dotnet restore VyaaparNexus.slnx"]
+cmds = ["dotnet restore VyaaparNexus.API/VyaaparNexus.API.csproj"]
 
 [phases.build]
 cmds = ["dotnet publish VyaaparNexus.API/VyaaparNexus.API.csproj --no-restore -c Release -o /app/publish"]
