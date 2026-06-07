@@ -1,5 +1,7 @@
 [build]
-builder = "nixpacks"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "dotnet /app/publish/VyaaparNexus.API.dll"
+healthcheckPath = "/health/live"
+healthcheckTimeout = 30
