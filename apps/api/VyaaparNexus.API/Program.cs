@@ -55,7 +55,8 @@ try
         {
             policy.WithOrigins(builder.Configuration["FrontendUrl"] ?? "http://localhost:5173")
                   .AllowAnyHeader()
-                  .AllowAnyMethod();
+                  .AllowAnyMethod()
+                  .AllowCredentials();
         });
     });
 
